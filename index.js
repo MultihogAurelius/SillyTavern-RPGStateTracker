@@ -765,8 +765,13 @@
     // Sections that should NEVER be paginated (show all entries always)
     const NO_PAGINATE = new Set(['CHARACTER', 'ABILITIES']);
     const COLLAPSE_KEY = 'rpg_tracker_collapsed';
+    const DETACHED_KEY = 'rpg_tracker_detached';
 
     const _sectionPages = {};
+
+    function getPageSize(renderType) {
+        return renderType === 'SPELLS' ? 5 : PAGE_SIZE;
+    }
 
     function loadCollapsed() {
         try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); }
@@ -774,6 +779,14 @@
     }
     function saveCollapsed(set) {
         localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...set]));
+    }
+
+    function loadDetached() {
+        try { return new Set(JSON.parse(localStorage.getItem(DETACHED_KEY) || '[]')); }
+        catch { return new Set(); }
+    }
+    function saveDetached(set) {
+        localStorage.setItem(DETACHED_KEY, JSON.stringify([...set]));
     }
 
 
@@ -867,9 +880,26 @@
         ];
 
         const collapsed = loadCollapsed();
+        const detached = loadDetached();
 
-        return sorted.map(tag => {
+        // If filtering by a single tag (detached window context)
+        const tagsToRender = arguments[1] ? [arguments[1]] : sorted;
+
+        return tagsToRender.map(tag => {
             const content = blocks[tag];
+            if (content === undefined && arguments[1]) {
+                return `<div class="rt-empty">Waiting for ${tag} data...</div>`;
+            }
+            if (content === undefined) return '';
+            
+            // If main panel context, filter out detached windows
+            if (!arguments[1] && detached.has(tag)) {
+                return `<div class="rt-detached-placeholder" data-tag="${tag}">
+                    <span class="rt-placeholder-icon">⧉</span> ${tag} is detached
+                    <button class="rt-reattach-btn-inline" data-tag="${tag}" title="Re-attach">↓</button>
+                </div>`;
+            }
+
             const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
             const icon = customField?.icon || BLOCK_ICONS[tag] || '📄';
             const items = blockToItems(tag, content);
@@ -877,13 +907,14 @@
 
             const renderType = customField?.renderType || tag;
             const isFullView = getSettings().fullViewSections.includes(tag) || NO_PAGINATE.has(renderType);
+            const localPageSize = getPageSize(renderType);
 
             const page = isFullView ? 0 : (_sectionPages[tag] ?? 0);
-            const totalPages = isFullView ? 1 : Math.ceil(items.length / PAGE_SIZE);
+            const totalPages = isFullView ? 1 : Math.ceil(items.length / localPageSize);
             const safePage = Math.min(page, Math.max(0, totalPages - 1));
             if (!isFullView) _sectionPages[tag] = safePage;
 
-            const pageItems = items.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+            const pageItems = isFullView ? items : items.slice(safePage * localPageSize, (safePage + 1) * localPageSize);
             const bodyClass = `rt-section-body${renderType === 'ABILITIES' ? ' rt-abilities-body' : ''}`;
 
             const pagination = totalPages > 1 ? `
@@ -893,13 +924,25 @@
                     <button class="rt-page-btn" data-tag="${tag}" data-dir="1"${safePage >= totalPages - 1 ? ' disabled' : ''}>&#8250;</button>
                 </div>` : '';
 
+            // Don't show detach button if already in detached context (filterTag provided)
+            const detachBtn = !arguments[1] ? `
+                <button class="rt-detach-btn" data-tag="${tag}" title="Detach panel">
+                    ⧉
+                </button>
+            ` : '';
+
+            const fullViewBtn = NO_PAGINATE.has(renderType) ? '' : `
+                <button class="rt-fullview-btn${isFullView ? ' active' : ''}" data-tag="${tag}" title="${isFullView ? 'Switch to Paged View' : 'Switch to Full List'}">
+                    ${isFullView ? '📜' : '📑'}
+                </button>
+            `;
+
             return `<div class="rt-section-card${isCollapsed ? ' rt-collapsed' : ''}" data-tag="${tag}">
                 <div class="rt-section-header" data-tag="${tag}">
                     <span>${icon} ${tag}</span>
                     <div class="rt-section-header-right">
-                        <button class="rt-fullview-btn${isFullView ? ' active' : ''}" data-tag="${tag}" title="${isFullView ? 'Switch to Paged View' : 'Switch to Full List'}">
-                            ${isFullView ? '📜' : '📑'}
-                        </button>
+                        ${detachBtn}
+                        ${fullViewBtn}
                         <span class="rt-item-count">${items.length} ${items.length === 1 ? 'entry' : 'entries'}</span>
                         <span class="rt-collapse-icon">${isCollapsed ? '&#9656;' : '&#9662;'}</span>
                     </div>
@@ -909,19 +952,17 @@
         }).join('');
     }
 
-    function refreshRenderedView() {
-        if (!_renderedViewActive) return;
-        const s = getSettings();
-        const memo = _historyViewIndex === -1
-            ? s.currentMemo
-            : (s.memoHistory[_historyViewIndex] ?? '');
-        const el = document.getElementById('rpg-tracker-render');
-        if (!el) return;
-        el.innerHTML = renderMemoAsCards(memo);
-
+    function bindRenderedCardEvents(el, memo, isDetachedContext = false) {
         el.querySelectorAll('.rt-section-header').forEach(header => {
-            header.addEventListener('click', () => {
-                const tag = /** @type {HTMLElement} */ (header).dataset.tag;
+            // Unbind to prevent duplicate listeners
+            const oldHeader = header;
+            const newHeader = oldHeader.cloneNode(true);
+            oldHeader.parentNode.replaceChild(newHeader, oldHeader);
+            
+            newHeader.addEventListener('click', (e) => {
+                // Prevent toggle if clicking on a button
+                if (e.target.closest('button')) return;
+                const tag = newHeader.dataset.tag;
                 if (!tag) return;
                 const col = loadCollapsed();
                 if (col.has(tag)) col.delete(tag); else col.add(tag);
@@ -933,12 +974,17 @@
         el.querySelectorAll('.rt-page-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const tag = /** @type {HTMLElement} */ (btn).dataset.tag;
-                const dir = parseInt(/** @type {HTMLElement} */(btn).dataset.dir);
+                const tag = btn.dataset.tag;
+                const dir = parseInt(btn.dataset.dir);
                 if (!tag) return;
                 const curBlocks = parseMemoBlocks(memo);
                 const items = blockToItems(tag, curBlocks[tag] ?? '');
-                const totalPages = Math.ceil(items.length / PAGE_SIZE);
+                
+                const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
+                const renderType = customField?.renderType || tag;
+                const localPageSize = getPageSize(renderType);
+                
+                const totalPages = Math.ceil(items.length / localPageSize);
                 const cur = _sectionPages[tag] ?? 0;
                 _sectionPages[tag] = Math.max(0, Math.min(totalPages - 1, cur + dir));
                 refreshRenderedView();
@@ -948,7 +994,7 @@
         el.querySelectorAll('.rt-fullview-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const tag = /** @type {HTMLElement} */ (btn).dataset.tag;
+                const tag = btn.dataset.tag;
                 if (!tag) return;
                 const s = getSettings();
                 const idx = s.fullViewSections.indexOf(tag);
@@ -958,7 +1004,147 @@
                 refreshRenderedView();
             });
         });
+
+        if (!isDetachedContext) {
+            el.querySelectorAll('.rt-detach-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const tag = btn.dataset.tag;
+                    if (!tag) return;
+                    const detached = loadDetached();
+                    detached.add(tag);
+                    saveDetached(detached);
+                    createDetachedPanel(tag);
+                    refreshRenderedView();
+                });
+            });
+
+            el.querySelectorAll('.rt-reattach-btn-inline').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const tag = btn.dataset.tag;
+                    if (!tag) return;
+                    const detached = loadDetached();
+                    detached.delete(tag);
+                    saveDetached(detached);
+                    const panel = document.getElementById(`rt-detached-panel-${tag}`);
+                    if (panel) panel.remove();
+                    refreshRenderedView();
+                });
+            });
+        }
     }
+
+    function refreshRenderedView() {
+        if (!_renderedViewActive) return;
+        const s = getSettings();
+        const memo = _historyViewIndex === -1
+            ? s.currentMemo
+            : (s.memoHistory[_historyViewIndex] ?? '');
+        const el = document.getElementById('rpg-tracker-render');
+        if (el) {
+            el.innerHTML = renderMemoAsCards(memo);
+            bindRenderedCardEvents(el, memo, false);
+        }
+
+        // Update any detached panels
+        const detached = loadDetached();
+        detached.forEach(tag => {
+            const panel = document.getElementById(`rt-detached-panel-${tag}`);
+            if (panel) {
+                const body = panel.querySelector('.rpg-tracker-detached-body');
+                if (body) {
+                    body.innerHTML = renderMemoAsCards(memo, tag);
+                    bindRenderedCardEvents(body, memo, true);
+                }
+            } else {
+                // Panel missing, recreate it
+                createDetachedPanel(tag);
+            }
+        });
+    }
+
+    function createDetachedPanel(tag) {
+        if (document.getElementById(`rt-detached-panel-${tag}`)) return;
+
+        const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
+        const icon = customField?.icon || BLOCK_ICONS[tag] || '📄';
+
+        const panel = document.createElement('div');
+        panel.id = `rt-detached-panel-${tag}`;
+        panel.className = 'rpg-tracker-panel rpg-tracker-detached-panel';
+        panel.innerHTML = `
+            <div class="rpg-tracker-header rt-detached-header">
+                <div class="rpg-tracker-header-left">
+                    <span>${icon} ${tag}</span>
+                </div>
+                <div class="rpg-tracker-header-right">
+                    <button class="rpg-tracker-icon-btn rt-reattach-btn" data-tag="${tag}" title="Re-attach">✕</button>
+                </div>
+            </div>
+            <div class="rpg-tracker-content rpg-tracker-detached-body">
+                <!-- Content injected here via refreshRenderedView() -->
+            </div>
+        `;
+
+        document.body.appendChild(panel);
+
+        const header = panel.querySelector('.rt-detached-header');
+        if (header instanceof HTMLElement) {
+            makeDraggable(panel, header, `rpg_tracker_geometry_${tag}`);
+        }
+        
+        // Setup specialized geometry keys
+        const geoKey = `rpg_tracker_geometry_${tag}`;
+        
+        try {
+            const saved = JSON.parse(localStorage.getItem(geoKey));
+            if (saved && saved.left !== undefined) {
+                if (saved.left !== undefined) { panel.style.left = saved.left + 'px'; panel.style.right = 'auto'; }
+                if (saved.top !== undefined) { panel.style.top = saved.top + 'px'; panel.style.bottom = 'auto'; }
+                if (saved.width) panel.style.width = saved.width + 'px';
+                if (saved.height) panel.style.height = saved.height + 'px';
+            } else {
+                const mainPanel = document.getElementById('rpg-tracker-panel');
+                if (mainPanel) {
+                    const rect = mainPanel.getBoundingClientRect();
+                    // spawn adjacent to the main panel if no stored position
+                    let spawnLeft = rect.left - 270;
+                    if (spawnLeft < 0) spawnLeft = rect.right + 10;
+                    panel.style.left = Math.max(10, spawnLeft) + 'px';
+                    panel.style.top = rect.top + 'px';
+                    panel.style.right = 'auto';
+                    panel.style.bottom = 'auto';
+                }
+            }
+        } catch { /* ignore */ }
+
+        // Debounced save geometry
+        let _resizeTimer;
+        const ro = new ResizeObserver(() => {
+            clearTimeout(_resizeTimer);
+            _resizeTimer = setTimeout(() => {
+                const rect = panel.getBoundingClientRect();
+                localStorage.setItem(geoKey, JSON.stringify({
+                    left: rect.left, top: rect.top,
+                    width: rect.width, height: rect.height
+                }));
+            }, 300);
+        });
+        ro.observe(panel);
+
+        panel.querySelector('.rt-reattach-btn').addEventListener('click', () => {
+            const detached = loadDetached();
+            detached.delete(tag);
+            saveDetached(detached);
+            panel.remove();
+            refreshRenderedView();
+        });
+
+        // Trigger an initial render to fill its body
+        refreshRenderedView();
+    }
+
 
 
 
@@ -1217,7 +1403,7 @@
      * @param {HTMLElement} panel
      * @param {HTMLElement} handle
      */
-    function makeDraggable(panel, handle) {
+    function makeDraggable(panel, handle, customKey = null) {
         let isDragging = false;
         let startX, startY, startLeft, startTop;
 
@@ -1243,7 +1429,18 @@
         });
 
         document.addEventListener('mouseup', () => {
-            if (isDragging) { isDragging = false; savePanelGeometry(panel); }
+            if (isDragging) { 
+                isDragging = false; 
+                if (customKey) {
+                    const rect = panel.getBoundingClientRect();
+                    localStorage.setItem(customKey, JSON.stringify({
+                        left: rect.left, top: rect.top,
+                        width: rect.width, height: rect.height
+                    }));
+                } else {
+                    savePanelGeometry(panel); 
+                }
+            }
         });
     }
 
