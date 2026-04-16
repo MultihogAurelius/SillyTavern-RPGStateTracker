@@ -58,3 +58,5 @@ Paste exclusions like this at the top of your **Core System Prompt** text area i
 
 ## License
 MIT
+
+AND YES, IT IS FULLY VIBE-CODED!
