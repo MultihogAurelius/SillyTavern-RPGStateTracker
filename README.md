@@ -10,7 +10,7 @@ The State Model functions both as a "cheat sheet" for the AI as well as a UI for
 - **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
   - The extension provides customizable stock fields: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
   - **Custom Fields:** You can define entirely new, arbitrary tags (e.g., `[QUESTS]`, `[RELATIONSHIPS]`). Assign them custom emoji icons, specific rendering styles (like HP bars, pips, line-items, or pills), and unique extraction prompt logic.
-  - **Editable Logic:** The prompt instruction for every field (even the stock ones) can be freely edited within the UI to fit the exact rules of your campaign.
+  - **Editable Logic:** The prompt instruction for every field (even the stock ones) can be freely edited from extension settings to fit the exact rules of your campaign.
 - **Rendered HUD:** A draggable, dynamic floating panel presenting the state as organized, paginated cards (with visual HP bars and spell slot pips). You can effortlessly toggle between this "Rendered View" and a text-based "Raw View".
 - **Snapshot History:** Maintains a rolling history of the last 5 state changes. You can navigate back in time to view past states and restore them if the AI makes a mistake.
 - **Delta Change Log:** A resizeable logging panel showing a line-by-line diff (`+`/`-`) of what the Model modified in the most recent turn.
@@ -39,22 +39,7 @@ This extension is designed to work as one half of a two-part simulation system. 
 
 ## System Prompt Customization
 
-By default, the RPG Tracker comes with a generalized prompt that tries to parse standard roleplay logs. However, **you must customize the core System Prompt** (in the extensions UI) if you use a strict formatting framework (like mandatory status footers or explicit XP tracking syntax in your AI responses).
-
-### Example: Strict Framework Exclusion
-If your bot always outputs a footer like `*(Status: X HP) | (XP: Y/Z)*` or logs dice rolls `*(Roll: 14)*`, you should explicitly tell the State Model *not* to copy that syntax in the system prompt in extension settings; otherwise it might confuse it for raw state data.
-
-*Here is an example snippet of how you might modify the default prompt to exclude rigid narrative engine formats:*
-
-```text
-IGNORE COMPLETELY — do NOT track or reproduce these patterns from the narrative:
-  - The status footer: `*(Status: X HP) | (XP: Y/Z) | (Vibe: Z)*` and `*Level X | HH:MM, Day X*`
-  - Inline XP awards: `*(+X XP — reason)*`
-  - RNG/dice roll annotations: `*(Attack: ...) *(Damage: ...)* *(Roll: ...)*`
-  - Random event checks: `*(Random Event Check: ...)* *(Event Type Check: ...)*`
-```
-
-Paste exclusions like this at the top of your **Core System Prompt** text area inside the RPG Tracker extension settings.
+By default, the RPG Tracker comes with a generalized prompt that tries to parse standard roleplay logs. It may or may not work out of the box for your particular setup, but if you do anything D&D-adjacent, it probably will.
 
 ## License
 MIT
