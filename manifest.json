@@ -1,0 +1,10 @@
+{
+  "display_name": "RPG Tracker",
+  "version": "0.1.0",
+  "author": "Antigravity",
+  "js": "index.js",
+  "css": "style.css",
+  "loading_order": 20,
+  "generate_interceptor": "rpgTrackerInterceptor",
+  "auto_update": false
+}

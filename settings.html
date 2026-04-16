@@ -1,0 +1,147 @@
+<div class="rpg-tracker-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>RPG Tracker</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="flex-container flexFlowColumn gap-1">
+                <label class="checkbox_label">
+                    <input id="rpg_tracker_enabled" type="checkbox" />
+                    <span>Enable RPG Tracker</span>
+                </label>
+                
+                <label class="checkbox_label">
+                    <input id="rpg_tracker_debug" type="checkbox" />
+                    <span>Debug Mode (Logs to console)</span>
+                </label>
+                
+                <hr>
+                <b>Connection Settings</b>
+                <small>Route the State Model pass through a specific SillyTavern profile.</small>
+
+                <div class="flex-container flexFlowColumn gap-1">
+                    <label for="rpg_tracker_connection_source">Connection Source</label>
+                    <select id="rpg_tracker_connection_source" class="text_pole">
+                        <option value="default">Use Currently Selected (Main API)</option>
+                        <option value="profile">SillyTavern Profile</option>
+                    </select>
+
+                    <div id="rpg_tracker_profile_group" style="display: none;">
+                        <label for="rpg_tracker_connection_profile">Select Profile</label>
+                        <select id="rpg_tracker_connection_profile" class="text_pole">
+                            <option value="">-- No Profile Selected --</option>
+                        </select>
+                    </div>
+
+                    <label for="rpg_tracker_completion_preset" style="margin-top: 10px;">Generation Settings Preset</label>
+                    <select id="rpg_tracker_completion_preset" class="text_pole">
+                        <option value="">-- Use Current Settings --</option>
+                    </select>
+
+                    <label for="rpg_tracker_max_tokens">Max Response Tokens</label>
+                    <input id="rpg_tracker_max_tokens" type="number" class="text_pole" placeholder="0 = No limit" />
+                </div>
+                
+                <hr>
+                <b>Scenario Profiles</b>
+                <small>Save and switch between different scenario states (memo, history, modules).</small>
+                <div class="flex-container flexFlowColumn gap-1">
+                    <select id="rpg_tracker_profile_select" class="text_pole">
+                        <option value="">-- No Profile --</option>
+                    </select>
+                    <div class="flex-container gap-1">
+                        <button id="rpg_tracker_profile_save" class="menu_button interactable" style="flex: 1;">
+                            <i class="fa-solid fa-floppy-disk"></i> Save As
+                        </button>
+                        <button id="rpg_tracker_profile_load" class="menu_button interactable" style="flex: 1;">
+                            <i class="fa-solid fa-folder-open"></i> Load
+                        </button>
+                        <button id="rpg_tracker_profile_delete" class="menu_button interactable" style="flex: 1;">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+                <b>Active Modules</b>
+                <small>Select which state elements the LLM should track.</small>
+                
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_character" type="checkbox" />
+                        <span>Character Status</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="character" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+                
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_party" type="checkbox" />
+                        <span>Party Status</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="party" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_combat" type="checkbox" />
+                        <span>Combat Tracker</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="combat" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_inventory" type="checkbox" />
+                        <span>Inventory & Items</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="inventory" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_abilities" type="checkbox" />
+                        <span>Abilities & Features</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="abilities" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_spells" type="checkbox" />
+                        <span>Spells & Magic</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="spells" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+                <hr>
+                <b>Custom Fields</b>
+                <small>Define custom tracking sections for the model to parse.</small>
+                <button id="rpg_tracker_manage_custom_fields" class="menu_button interactable">
+                    <i class="fa-solid fa-layer-group"></i> Manage Custom Fields
+                </button>
+                
+                <hr>
+                <b>State Model Core Instruction</b>
+                <small>Edit the prompt logic the State Model uses. Use <code>{{modulesText}}</code> to inject the active module guidelines.</small>
+                <textarea id="rpg_tracker_core_prompt" class="text_pole autoSetHeight" rows="5"></textarea>
+                <button id="rpg_tracker_btn_reset_prompt" class="menu_button interactable" style="align-self: flex-start; margin-top: 4px;">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Reset to Default
+                </button>
+
+                <hr>
+                <b>Manual Actions</b>
+                <div class="flex-container gap-1">
+                    <button id="rpg_tracker_btn_update" class="menu_button interactable" style="flex: 1;">
+                        <i class="fa-solid fa-rotate"></i> Update Memo Now
+                    </button>
+                    <button id="rpg_tracker_btn_clear" class="menu_button interactable" style="flex: 1;">
+                        <i class="fa-solid fa-trash"></i> Clear Memo History
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
