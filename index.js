@@ -57,7 +57,8 @@
                 "5. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
                 "6. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n\n" +
                 "REGARDING COMBAT:\n" +
-                "[COMBAT] section is only created when actual combat begins, not when enemies are simply present in the scene.",
+                "1. [COMBAT] section is only created when actual combat begins, not when enemies are simply present in the scene.\n" +
+                "2. If an entity dies in combat, output it as 0/X HP, for example \"Shambling Corpse B (Fodder): 0/9 HP | AC: 10,\" do not omit it completely from the next state.",
             modules: {
                 character: true,
                 party: true,
