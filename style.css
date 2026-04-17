@@ -1,3 +1,113 @@
+/* Theme Scopes */
+.rpg-tracker-panel {
+    /* Hacker (Default fallback) */
+    --rt-bg: rgba(20, 20, 20, 0.88);
+    --rt-blur: blur(12px);
+    --rt-border: var(--rt-border);
+    --rt-text: #eee;
+    --rt-text-muted: #888;
+    --rt-font: 'Consolas', 'Monaco', monospace;
+    --rt-font-mono: 'Consolas', 'Monaco', monospace;
+    --rt-accent: #00ffaa;
+    --rt-accent-dim: rgba(0, 255, 170, 0.4);
+    --rt-accent-bg: rgba(0, 255, 170, 0.1);
+    --rt-card-border: var(--rt-card-border);
+    --rt-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --rt-header-bg: rgba(255, 255, 255, 0.05);
+    --rt-card-bg: rgba(255, 255, 255, 0.03);
+    --rt-card-header: rgba(255, 255, 255, 0.04);
+}
+
+.rpg-tracker-panel.rt-theme-native {
+    --rt-bg: var(--SmartThemeBlurTrans, rgba(30, 30, 30, 0.85));
+    --rt-blur: var(--smartThemeBlur, blur(10px));
+    --rt-border: var(--smartThemeBorder, 1px solid rgba(255,255,255,0.1));
+    --rt-text: var(--SmartThemeBodyColorText, #eee);
+    --rt-text-muted: var(--SmartThemeBodyColorTextMuted, #aaa);
+    --rt-font: var(--primaryFontFamily, system-ui, sans-serif);
+    --rt-font-mono: var(--monospaceFontFamily, 'Consolas', monospace);
+    --rt-accent: var(--smartThemeMenuColorText, #00ffaa);
+    --rt-accent-dim: var(--white30a, rgba(255, 255, 255, 0.3));
+    --rt-accent-bg: var(--white10a, rgba(255, 255, 255, 0.1));
+    --rt-card-border: var(--smartThemeBorder, 1px solid rgba(255, 255, 255, 0.1));
+    --rt-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    --rt-header-bg: var(--black30a, rgba(0,0,0,0.3));
+    --rt-card-bg: var(--black50a, rgba(0,0,0,0.2));
+    --rt-card-header: var(--black30a, rgba(0,0,0,0.3));
+}
+
+.rpg-tracker-panel.rt-theme-hacker {
+    --rt-bg: rgba(10, 15, 10, 0.95);
+    --rt-blur: blur(0px);
+    --rt-border: 1px solid #00ffaa;
+    --rt-text: #00dd88;
+    --rt-text-muted: #007744;
+    --rt-font: 'Consolas', 'Courier New', monospace;
+    --rt-font-mono: 'Consolas', 'Courier New', monospace;
+    --rt-accent: #00ffaa;
+    --rt-accent-dim: rgba(0, 255, 170, 0.5);
+    --rt-accent-bg: rgba(0, 255, 170, 0.15);
+    --rt-card-border: 1px dashed rgba(0, 255, 170, 0.3);
+    --rt-shadow: 0 0 20px rgba(0, 255, 170, 0.15);
+    --rt-header-bg: rgba(0, 255, 170, 0.1);
+    --rt-card-bg: rgba(0, 0, 0, 0.5);
+    --rt-card-header: rgba(0, 255, 170, 0.05);
+}
+
+.rpg-tracker-panel.rt-theme-fantasy {
+    --rt-bg: rgba(45, 35, 25, 0.9);
+    --rt-blur: blur(4px);
+    --rt-border: 1px solid #8b6b4a;
+    --rt-text: #e6dac3;
+    --rt-text-muted: #a69176;
+    --rt-font: 'Georgia', 'Times New Roman', serif;
+    --rt-font-mono: 'Consolas', monospace;
+    --rt-accent: #ffd700;
+    --rt-accent-dim: rgba(255, 215, 0, 0.4);
+    --rt-accent-bg: rgba(255, 215, 0, 0.1);
+    --rt-card-border: 1px solid rgba(139, 107, 74, 0.4);
+    --rt-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 40px rgba(0,0,0,0.5);
+    --rt-header-bg: rgba(0, 0, 0, 0.4);
+    --rt-card-bg: rgba(20, 15, 10, 0.4);
+    --rt-card-header: rgba(0, 0, 0, 0.3);
+}
+
+.rpg-tracker-panel.rt-theme-hologram {
+    --rt-bg: rgba(10, 20, 30, 0.6);
+    --rt-blur: blur(16px);
+    --rt-border: 1px solid rgba(0, 255, 255, 0.3);
+    --rt-text: #e0ffff;
+    --rt-text-muted: #66b3cc;
+    --rt-font: 'Segoe UI', 'Roboto', sans-serif;
+    --rt-font-mono: 'Space Mono', 'Consolas', monospace;
+    --rt-accent: #00ffff;
+    --rt-accent-dim: rgba(0, 255, 255, 0.5);
+    --rt-accent-bg: rgba(0, 255, 255, 0.15);
+    --rt-card-border: 1px solid rgba(0, 255, 255, 0.2);
+    --rt-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 255, 255, 0.2), inset 0 0 15px rgba(0, 255, 255, 0.1);
+    --rt-header-bg: rgba(0, 255, 255, 0.1);
+    --rt-card-bg: rgba(0, 50, 80, 0.2);
+    --rt-card-header: rgba(0, 255, 255, 0.05);
+}
+
+/* Slim Scrollbars */
+.rpg-tracker-panel *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.rpg-tracker-panel *::-webkit-scrollbar-track {
+    background: transparent;
+}
+.rpg-tracker-panel *::-webkit-scrollbar-thumb {
+    background: var(--rt-text-muted);
+    border-radius: 3px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+}
+.rpg-tracker-panel *::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 .rpg-tracker-panel {
     position: fixed;
     top: 100px;
@@ -6,16 +116,16 @@
     height: 420px;
     min-width: 220px;
     min-height: 200px;
-    background: rgba(20, 20, 20, 0.88);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--rt-bg);
+    backdrop-filter: var(--rt-blur);
+    border: var(--rt-border);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
     z-index: 2000;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    color: #eee;
-    font-family: 'Consolas', 'Monaco', monospace;
+    box-shadow: var(--rt-shadow);
+    color: var(--rt-text);
+    font-family: var(--rt-font);
     overflow: hidden;
     resize: both;
 }
@@ -32,7 +142,7 @@
 
 .rpg-tracker-header {
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--rt-header-bg);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     cursor: move;
     display: flex;
@@ -68,7 +178,7 @@
     padding: 0;
     margin-left: 2px;
     opacity: 0.7;
-    transition: opacity 0.2s, color 0.2s, transform 0.1s;
+    transition: opacity 0.2s, color 0.2s, transform 0.1s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
     outline: none;
 }
 
@@ -85,18 +195,18 @@
 .rpg-tracker-icon-btn {
     background: none;
     border: none;
-    color: #aaa;
+    color: var(--rt-text-muted);
     cursor: pointer;
     font-size: 0.85em;
     padding: 2px 5px;
     border-radius: 4px;
     line-height: 1;
-    transition: color 0.2s, background 0.2s;
+    transition: color 0.2s, background 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rpg-tracker-icon-btn:hover {
-    color: #00ffaa;
-    background: rgba(0, 255, 170, 0.08);
+    color: var(--rt-accent);
+    background: var(--rt-accent-bg);
 }
 
 .rpg-tracker-content {
@@ -114,7 +224,7 @@
     background: transparent;
     border: none;
     padding: 12px;
-    color: #00ffaa;
+    color: var(--rt-accent);
     font-family: inherit;
     font-size: 13px;
     resize: none;
@@ -124,7 +234,7 @@
 }
 
 .rpg-tracker-memo-area[readonly] {
-    color: #888;
+    color: var(--rt-text-muted);
     background: rgba(0, 0, 0, 0.2);
 }
 
@@ -141,36 +251,36 @@
 
 .rpg-tracker-prompt-input {
     flex: 1;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--rt-card-header);
+    border: var(--rt-border);
     border-radius: 6px;
-    color: #ddd;
+    color: var(--rt-text);
     font-size: 12px;
     padding: 6px 8px;
     resize: none;
     line-height: 1.4;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
     min-height: 44px;
     max-height: 120px;
     overflow-y: auto;
 }
 
 .rpg-tracker-prompt-input:focus {
-    border-color: rgba(0, 255, 170, 0.35);
+    border-color: var(--rt-accent-dim);
 }
 
 .rpg-tracker-prompt-input::placeholder {
-    color: #555;
+    color: var(--rt-text-muted);
     font-style: italic;
 }
 
 .rpg-tracker-prompt-send {
     flex-shrink: 0;
-    background: rgba(0, 255, 170, 0.1);
-    border: 1px solid rgba(0, 255, 170, 0.25);
-    color: #00ffaa;
+    background: var(--rt-accent-bg);
+    border: 1px solid var(--rt-accent-dim);
+    color: var(--rt-accent);
     border-radius: 6px;
     width: 32px;
     height: 32px;
@@ -179,12 +289,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background 0.2s, border-color 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rpg-tracker-prompt-send:hover {
-    background: rgba(0, 255, 170, 0.2);
-    border-color: rgba(0, 255, 170, 0.5);
+    background: var(--rt-accent-bg);
+    border-color: var(--rt-accent);
 }
 
 
@@ -199,7 +309,7 @@
 }
 
 .rt-empty {
-    color: #555;
+    color: var(--rt-text-muted);
     font-style: italic;
     font-size: 12px;
     padding: 12px;
@@ -207,8 +317,8 @@
 }
 
 .rt-section-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: var(--rt-card-bg);
+    border: var(--rt-card-border);
     border-radius: 6px;
     overflow: hidden;
 }
@@ -218,16 +328,16 @@
     font-weight: 700;
     letter-spacing: 0.8px;
     text-transform: uppercase;
-    color: #888;
+    color: var(--rt-text-muted);
     padding: 5px 10px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--rt-card-header);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
     user-select: none;
-    transition: background 0.15s;
+    transition: background 0.15s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rt-section-header:hover {
@@ -247,8 +357,9 @@
     margin: 0;
     cursor: pointer;
     font-size: 11px;
-    opacity: 0.3;
-    transition: opacity 0.2s, transform 0.1s;
+    opacity: 0.6;
+    color: var(--rt-text-muted);
+    transition: opacity 0.2s, color 0.2s, transform 0.1s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
     line-height: 1;
     display: flex;
     align-items: center;
@@ -257,6 +368,7 @@
 
 .rt-fullview-btn:hover {
     opacity: 1;
+    color: var(--rt-text);
 }
 
 .rt-fullview-btn.active {
@@ -270,14 +382,14 @@
 
 .rt-item-count {
     font-size: 9px;
-    color: #555;
+    color: var(--rt-text-muted);
     font-weight: 400;
     letter-spacing: 0;
 }
 
 .rt-collapse-icon {
     font-size: 10px;
-    color: #666;
+    color: var(--rt-text-muted);
 }
 
 .rt-collapsed .rt-section-body {
@@ -294,23 +406,23 @@
     border-top: 1px solid rgba(255,255,255,0.05);
     margin-top: 4px;
     font-size: 11px;
-    color: #666;
+    color: var(--rt-text-muted);
 }
 
 .rt-page-btn {
     background: none;
     border: 1px solid rgba(255,255,255,0.1);
-    color: #aaa;
+    color: var(--rt-text-muted);
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
     padding: 1px 7px;
     border-radius: 4px;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, border-color 0.15s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rt-page-btn:hover:not(:disabled) {
-    color: #00ffaa;
+    color: var(--rt-accent);
     border-color: rgba(0,255,170,0.4);
 }
 
@@ -321,7 +433,7 @@
 
 /* Onboarding empty state */
 .rt-empty {
-    color: #555;
+    color: var(--rt-text-muted);
     font-size: 12px;
     padding: 20px 16px;
     text-align: center;
@@ -338,7 +450,7 @@
 }
 
 .rt-empty small {
-    color: #888;
+    color: var(--rt-text-muted);
     font-size: 11px;
 }
 
@@ -356,7 +468,7 @@
 
 .rt-spell-level {
     font-size: 10px;
-    color: #888;
+    color: var(--rt-text-muted);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
@@ -399,7 +511,7 @@
 
 .rt-spell-name {
     font-size: 11px;
-    color: #ccc;
+    color: var(--rt-text);
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 4px;
@@ -427,7 +539,7 @@
 .rt-entity-row:last-child { border-bottom: none; }
 
 .rt-entity-name {
-    color: #ddd;
+    color: var(--rt-text);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -444,12 +556,12 @@
 .rt-hp-bar {
     height: 100%;
     border-radius: 3px;
-    transition: width 0.4s ease;
+    transition: width 0.4s ease; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rt-hp-label {
     font-size: 10px;
-    color: #888;
+    color: var(--rt-text-muted);
     white-space: nowrap;
     text-align: right;
 }
@@ -465,7 +577,7 @@
 
 /* Inventory */
 .rt-card-item {
-    color: #ccc;
+    color: var(--rt-text);
     padding: 1px 0;
     font-size: 12px;
 }
@@ -478,9 +590,9 @@
 }
 
 .rt-ability-pill {
-    background: rgba(0, 255, 170, 0.08);
-    border: 1px solid rgba(0, 255, 170, 0.2);
-    color: #00ffaa;
+    background: var(--rt-accent-bg);
+    border: 1px solid var(--rt-accent-dim);
+    color: var(--rt-accent);
     border-radius: 12px;
     padding: 2px 9px;
     font-size: 11px;
@@ -497,19 +609,19 @@
 .rt-card-kv:last-child { border-bottom: none; }
 
 .rt-card-key {
-    color: #888;
+    color: var(--rt-text-muted);
     min-width: 70px;
     flex-shrink: 0;
     font-size: 11px;
 }
 
 .rt-card-val {
-    color: #ddd;
+    color: var(--rt-text);
     font-size: 12px;
 }
 
 .rt-card-line {
-    color: #bbb;
+    color: var(--rt-text);
     font-size: 12px;
     padding: 1px 0;
 }
@@ -518,15 +630,15 @@
 
 .rpg-tracker-delta-resize-handle {
     height: 5px;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--rt-card-header);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     cursor: ns-resize;
     flex-shrink: 0;
-    transition: background 0.2s;
+    transition: background 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rpg-tracker-delta-resize-handle:hover {
-    background: rgba(0, 255, 170, 0.12);
+    background: var(--rt-accent-bg);
 }
 
 /* Delta Console */
@@ -547,14 +659,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 3px 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--rt-card-bg);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
 }
 
 .rpg-tracker-delta-title {
     font-size: 0.75em;
-    color: #555;
+    color: var(--rt-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -566,7 +678,7 @@
 }
 
 .rpg-tracker-delta-panel .delta-added {
-    color: #00ffaa;
+    color: var(--rt-accent);
 }
 
 .rpg-tracker-delta-panel .delta-removed {
@@ -576,7 +688,7 @@
 }
 
 .rpg-tracker-delta-panel .delta-empty {
-    color: #555;
+    color: var(--rt-text-muted);
     font-style: italic;
 }
 
@@ -589,7 +701,7 @@
     justify-content: space-between;
     align-items: center;
     font-size: 0.78em;
-    color: #888;
+    color: var(--rt-text-muted);
     flex-shrink: 0;
     gap: 6px;
     user-select: none;
@@ -603,19 +715,19 @@
 
 .rpg-tracker-nav-btn {
     background: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #aaa;
+    border: var(--rt-border);
+    color: var(--rt-text-muted);
     cursor: pointer;
     font-size: 0.85em;
     padding: 1px 6px;
     border-radius: 4px;
     line-height: 1.4;
-    transition: color 0.2s, border-color 0.2s;
+    transition: color 0.2s, border-color 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rpg-tracker-nav-btn:hover:not(:disabled) {
-    color: #00ffaa;
-    border-color: rgba(0, 255, 170, 0.4);
+    color: var(--rt-accent);
+    border-color: var(--rt-accent-dim);
 }
 
 .rpg-tracker-nav-btn:disabled {
@@ -625,25 +737,25 @@
 
 .rpg-tracker-nav-label {
     font-size: 0.8em;
-    color: #666;
+    color: var(--rt-text-muted);
     min-width: 52px;
     text-align: center;
     padding: 2px 4px;
     border-radius: 4px;
-    transition: background 0.2s, color 0.2s;
+    transition: background 0.2s, color 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .rpg-tracker-nav-label.clickable {
     cursor: pointer;
     background: rgba(0, 255, 170, 0.05);
-    color: #00ffaa;
+    color: var(--rt-accent);
     border: 1px solid rgba(0, 255, 170, 0.1);
 }
 
 .rpg-tracker-nav-label.clickable:hover {
-    background: rgba(0, 255, 170, 0.15);
-    color: #00ffaa;
-    border-color: rgba(0, 255, 170, 0.4);
+    background: var(--rt-accent-bg);
+    color: var(--rt-accent);
+    border-color: var(--rt-accent-dim);
 }
 
 /* Status dot */
@@ -670,9 +782,95 @@
     to { opacity: 1; }
 }
 
+/* Detached Panels */
+.rt-detached-panel {
+    min-height: auto;
+    min-width: 250px;
+    height: auto;
+    max-height: 80vh;
+}
+
+.rt-detached-panel .rpg-tracker-header {
+    cursor: move;
+    background: rgba(0, 0, 0, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 6px 10px;
+}
+
+.rt-detached-panel .rt-section-card {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+.rt-detached-panel .rt-section-header {
+    display: none; /* Hide internal header, use window header instead */
+}
+
+/* Detach Button */
+.rt-detach-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0.6;
+    color: var(--rt-text-muted);
+    transition: opacity 0.2s, color 0.2s, transform 0.1s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rt-detach-btn:hover {
+    opacity: 1;
+    color: var(--rt-accent);
+}
+
+.rt-detach-btn:active {
+    transform: scale(0.9);
+}
+
+.rt-detached-placeholder {
+    padding: 8px 10px;
+    color: var(--rt-text-muted);
+    font-size: 11px;
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.rt-placeholder-icon {
+    margin-right: 4px;
+    opacity: 0.5;
+}
+
+.rt-reattach-btn-inline {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--rt-text-muted);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s; transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.rt-reattach-btn-inline:hover {
+    background: rgba(0,255,170,0.1);
+    border-color: rgba(0,255,170,0.3);
+    color: var(--rt-accent);
+}
+
 /* Mobile UI overrides */
 @media screen and (max-width: 800px) {
-    .rpg-tracker-panel {
+    .rpg-tracker-panel:not(.rt-detached-panel) {
         top: 5vh !important;
         left: 3vw !important;
         right: 3vw !important;
@@ -684,5 +882,11 @@
         max-width: 100% !important;
         max-height: 90vh !important;
         resize: none !important;
+    }
+
+    .rt-detached-panel {
+        /* Allow detached panels to be smaller and repositionable even on mobile */
+        max-width: 90vw;
+        max-height: 40vh;
     }
 }

@@ -1070,9 +1070,10 @@
         const customField = (getSettings().customFields || []).find(f => f.tag.toUpperCase() === tag);
         const icon = customField?.icon || BLOCK_ICONS[tag] || '📄';
 
+        const settings = getSettings();
         const panel = document.createElement('div');
         panel.id = `rt-detached-panel-${tag}`;
-        panel.className = 'rpg-tracker-panel rpg-tracker-detached-panel';
+        panel.className = `rpg-tracker-panel rpg-tracker-detached-panel ${settings.trackerTheme || 'rt-theme-native'}`;
         panel.innerHTML = `
             <div class="rpg-tracker-header rt-detached-header">
                 <div class="rpg-tracker-header-left">
@@ -1157,7 +1158,7 @@
 
         const panel = document.createElement('div');
         panel.id = 'rpg-tracker-panel';
-        panel.className = 'rpg-tracker-panel';
+        panel.className = `rpg-tracker-panel ${settings.trackerTheme || 'rt-theme-native'}`;
         panel.innerHTML = `
             <div class="rpg-tracker-header" id="rpg-tracker-header">
                 <div class="rpg-tracker-header-left">
@@ -1725,6 +1726,25 @@
             maxTokensInput.val(settings.maxTokens || "").on('input', function () {
                 settings.maxTokens = parseInt(/** @type {string} */($(this).val())) || 0;
                 ctx.saveSettingsDebounced();
+            });
+
+            // Theme Select
+            const themeSelect = $('#rpg_tracker_theme_select');
+            themeSelect.val(settings.trackerTheme || 'rt-theme-native');
+            themeSelect.on('change', function () {
+                const newTheme = String($(this).val());
+                settings.trackerTheme = newTheme;
+                ctx.saveSettingsDebounced();
+                // Apply immediately
+                const panel = document.getElementById('rpg-tracker-panel');
+                if (panel) {
+                    panel.className = `rpg-tracker-panel ${newTheme}`;
+                    if (!settings.enabled) panel.classList.add('is-paused');
+                }
+                // Apply to detached panels
+                document.querySelectorAll('.rpg-tracker-detached-panel').forEach(dp => {
+                    dp.className = `rpg-tracker-panel rpg-tracker-detached-panel ${newTheme}`;
+                });
             });
 
             // Populate profiles using the connection helpers
