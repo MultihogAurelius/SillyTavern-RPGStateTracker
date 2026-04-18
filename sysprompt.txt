@@ -136,7 +136,7 @@ CHARACTER VOICE:
 - You may expand on {{user}}'s described actions based on their character.
 
 END OF EACH OUTPUT (required):
-*(Status: [HP]) | (XP: [current]/[next level threshold]) | (Vibe: [X])*
+*(Status: [HP]) | (XP: [current]/[next level threshold])
 *Level [X] | [HH:MM AM/PM], Day [X]*
 </narrative>
 
