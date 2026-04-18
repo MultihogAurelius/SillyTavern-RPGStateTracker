@@ -17,12 +17,14 @@
     let _stateModelRunning = false;
 
     const DEFAULT_STOCK_PROMPTS = {
-        character: "Main character's core stats, current HP, active statuses/buffs (with durations). Do NOT reproduce the Narrative Engine's summary footer line ((Status: X HP) | (XP: Y/Z) | (Vibe: ...)) as your own block content.",
+        character: "Main character's core stats, current Level, current HP, active statuses/buffs (with durations). Buffs/debuffs should be reported as time remaining, (e.g. Sick, 2 hours.) Round-based buffs/debuffs should be reported as \"X rounds.\" This remaining time should then tick down based on elapsed time or rounds.",
         party: "Companion/Party members, their current HP, and active statuses/buffs.",
-        combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Status: ...`. Update HP inline. You MUST output `[COMBAT]REMOVED[/COMBAT]` when the narrative ends combat.",
+        combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Status: ...`. Update HP inline. You MUST output `[COMBAT]REMOVED[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
-        spells: "Spell slots and spells known, grouped by level. Format each line as: `Level N (avail/max): Spell1, Spell2`. Track slot usage accurately. NEVER mix these with abilities."
+        spells: "Spell slots and spells known, grouped by level. Format each line as: `Level N (avail/max): Spell1, Spell2`. Track slot usage accurately. NEVER mix these with abilities.",
+        time: "Current time and day (e.g. '8:43 AM, Day 1'). The model uses this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.",
+        xp: "Current and maximum Experience Points (XP). Format as `XP: current/max`. You MUST output this field whenever the narrative mentions gaining experience or leveling up."
     };
 
     /**
@@ -46,7 +48,7 @@
             systemPromptTemplate:
                 "You are the State Extractor Model. Your task is to maintain a structured State Memo based on the roleplay narrative.\n" +
                 "IGNORE NARRATIVE FLUFF: Do not track temporary dialogue or actions. Only track persistent state changes.\n" +
-                "INTEGRATION: Track all durations stated by the narrative (e.g. 'poisoned for 3 turns'). Decrement by 1 each round. Remove when duration reaches 0.\n" +
+                "INTEGRATION: Track all durations stated by the narrative (e.g. 'poisoned for 3 turns'). Decrement by 1 each round in [COMBAT]. For out-of-combat durations, calculate the delta between the current [TIME] and the [TIME] in the PRIOR MEMO.\n" +
                 "CREATION: You MAY create a section that did not exist in the Prior Memo when the narrative warrants it based on your enabled modules.\n" +
                 "DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\n" +
                 "You must track the following enabled modules:\n{{modulesText}}\n" +
@@ -55,16 +57,20 @@
                 "2. Determine which sections changed. Only output sections that actually changed.\n" +
                 "3. Use strict [TAG]...[/TAG] structure based on the modules requested above. ALWAYS include the closing tag.\n" +
                 "   EXAMPLE FORMATTING:\n" +
+                "   [TIME]\n" +
+                "   8:43 AM, Day 1\n" +
+                "   [/TIME]\n\n" +
                 "   [CHARACTER]\n" +
                 "   Eliel: 8/8 HP | AC: 12\n" +
-                "   STR 8, DEX 14, CON 14\n" +
+                "   Level 1 | STR 8, DEX 14, CON 14\n" +
                 "   [/CHARACTER]\n\n" +
-                "   [INVENTORY]\n" +
-                "   200 GP, Quarterstaff, Grimoire, Potion x3\n" +
-                "   [/INVENTORY]\n\n" +
-                "   [CUSTOM_TAG]\n" +
-                "   (Format any custom fields exactly as instructed)\n" +
-                "   [/CUSTOM_TAG]\n" +
+                "   [COMBAT]\n" +
+                "   Combat Round 1\n" +
+                "   Goblin: 7/7 HP | AC: 15\n" +
+                "   [/COMBAT]\n\n" +
+                "   [XP]\n" +
+                "   XP: 100/300\n" +
+                "   [/XP]\n\n" +
                 "4. Omit unchanged sections entirely. Do NOT output a section if its contents did not change.\n" +
                 "5. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
                 "6. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n\n" +
@@ -77,13 +83,16 @@
                 combat: true,
                 inventory: true,
                 abilities: true,
-                spells: false
+                spells: false,
+                time: true,
+                xp: true
             },
             stockPrompts: { ...DEFAULT_STOCK_PROMPTS },
             customFields: [],
             profiles: {},
             activeProfile: "",
-            fullViewSections: []
+            fullViewSections: [],
+            blockOrder: ['TIME', 'XP', 'COMBAT', 'CHARACTER', 'PARTY', 'SPELLS', 'ABILITIES', 'INVENTORY']
         };
 
         if (!extensionSettings[MODULE_NAME]) {
@@ -759,8 +768,8 @@
 
 
 
-    const BLOCK_ICONS = { CHARACTER: '🧙', PARTY: '👥', COMBAT: '⚔️', INVENTORY: '🎒', ABILITIES: '✨', SPELLS: '📖' };
-    const BLOCK_ORDER = ['COMBAT', 'CHARACTER', 'PARTY', 'SPELLS', 'ABILITIES', 'INVENTORY'];
+    const BLOCK_ICONS = { TIME: '🕒', XP: '🇽🇵', CHARACTER: '🧙', PARTY: '👥', COMBAT: '⚔️', INVENTORY: '🎒', ABILITIES: '✨', SPELLS: '📖' };
+    const BLOCK_ORDER = ['TIME', 'XP', 'COMBAT', 'CHARACTER', 'PARTY', 'SPELLS', 'ABILITIES', 'INVENTORY'];
     const PAGE_SIZE = 8;
     // Sections that should NEVER be paginated (show all entries always)
     const NO_PAGINATE = new Set(['CHARACTER', 'ABILITIES']);
@@ -803,6 +812,11 @@
             case 'COMBAT':
             case 'PARTY':
                 return lines.map(line => {
+                    // Check for Combat Round header
+                    if (tag === 'COMBAT' && /Combat Round\s*\d+/i.test(line)) {
+                        return `<div class="rt-combat-round">${escapeHtml(line)}</div>`;
+                    }
+
                     const hpMatch = line.match(/^(.+?):\s*(\d+)\/(\d+)\s*HP\s*[:|]?\s*(.*)$/i);
                     if (!hpMatch) return `<div class="rt-card-line">${escapeHtml(line)}</div>`;
                     const [, name, cur, max, rest] = hpMatch;
@@ -816,6 +830,21 @@
                         </div>
                         <span class="rt-hp-label">${cur}/${max}</span>
                         ${status ? `<span class="rt-status">${escapeHtml(status)}</span>` : ''}
+                    </div>`;
+                });
+            case 'TIME':
+                return lines.map(line => `<div class="rt-card-line">${escapeHtml(line)}</div>`);
+            case 'XP':
+                return lines.map(line => {
+                    const xpMatch = line.match(/^XP:\s*(\d+)\/(\d+)$/i);
+                    if (!xpMatch) return `<div class="rt-card-line">${escapeHtml(line)}</div>`;
+                    const [, cur, max] = xpMatch;
+                    const pct = Math.max(0, Math.min(100, (Number(cur) / Number(max)) * 100));
+                    return `<div class="rt-xp-row">
+                        <div class="rt-xp-label">XP: ${cur} / ${max}</div>
+                        <div class="rt-xp-bar-wrap">
+                            <div class="rt-xp-bar" style="width:${pct.toFixed(1)}%;"></div>
+                        </div>
                     </div>`;
                 });
             case 'SPELLS': {
@@ -874,9 +903,11 @@
             return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
         }
 
+        const s = getSettings();
+        const order = s.blockOrder || BLOCK_ORDER;
         const sorted = [
-            ...BLOCK_ORDER.filter(k => blocks[k] !== undefined),
-            ...Object.keys(blocks).filter(k => !BLOCK_ORDER.includes(k)).sort()
+            ...order.filter(k => blocks[k] !== undefined),
+            ...Object.keys(blocks).filter(k => !order.includes(k)).sort()
         ];
 
         const collapsed = loadCollapsed();
@@ -1167,6 +1198,7 @@
                     <button class="rpg-tracker-stop-btn" id="rpg-tracker-stop-btn" title="Stop Generation" style="display:none;">■</button>
                 </div>
                 <div class="rpg-tracker-header-right">
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-prompt-btn" title="Toggle direct prompt">💬</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-view-btn" title="Toggle rendered view">⊞</button>
@@ -1330,6 +1362,27 @@
         panel.querySelector('#rpg-tracker-prompt-input').addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); promptSend(); }
         });
+        
+        // Manual update from panel button
+        const manualUpdate = async () => {
+            const { chat } = SillyTavern.getContext();
+            if (!chat || chat.length === 0) return toastr['info']("No chat history found.", "RPG Tracker");
+
+            let lastAssistantMsg = "";
+            for (let i = chat.length - 1; i >= 0; i--) {
+                if (!chat[i].is_user && !chat[i].is_system) {
+                    lastAssistantMsg = chat[i].mes;
+                    break;
+                }
+            }
+            if (!lastAssistantMsg) return toastr['info']("No assistant message to parse.", "RPG Tracker");
+
+            toastr['info']("Triggering manual State Update...", "RPG Tracker");
+            await runStateModelPass(lastAssistantMsg);
+        };
+        panel.querySelector('#rpg-tracker-update-btn').addEventListener('click', manualUpdate);
+        // Link the settings button too if it's already rendered
+        $('#rpg_tracker_btn_update').off('click').on('click', manualUpdate);
 
         // Snapshot navigation
         panel.querySelector('#rpg-tracker-nav-back').addEventListener('click', () => navigateSnapshot(1));
@@ -1678,6 +1731,88 @@
         document.getElementById('rt_pe_cancel').onclick = close;
     }
 
+    function refreshOrderList() {
+        const s = getSettings();
+        const list = document.getElementById('rpg_tracker_order_list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        
+        // Fallback for icons not in BLOCK_ICONS (custom fields)
+        const getIcon = (tag) => {
+            if (BLOCK_ICONS[tag]) return BLOCK_ICONS[tag];
+            const custom = (s.customFields || []).find(f => f.tag.toUpperCase() === tag);
+            return custom?.icon || '📄';
+        };
+
+        // Ensure blockOrder is initialized
+        if (!s.blockOrder) s.blockOrder = [...BLOCK_ORDER];
+        
+        // Merge in any custom tags that aren't in the order yet
+        (s.customFields || []).forEach(f => {
+            const tag = f.tag.toUpperCase();
+            if (f.enabled && !s.blockOrder.includes(tag)) {
+                s.blockOrder.push(tag);
+            }
+        });
+
+        // Filter out tags that are neither stock nor active custom fields
+        const activeCustomTags = new Set((s.customFields || []).filter(f => f.enabled).map(f => f.tag.toUpperCase()));
+        const order = s.blockOrder.filter(tag => BLOCK_ORDER.includes(tag) || activeCustomTags.has(tag));
+        s.blockOrder = order;
+
+        order.forEach((tag, index) => {
+            const item = document.createElement('div');
+            item.className = 'flex-container gap-1 alignitemscenter rt-order-item';
+            item.style.padding = '5px';
+            item.style.background = 'var(--black30a)';
+            item.style.borderRadius = '4px';
+            item.style.border = '1px solid var(--smartThemeBorderColor)';
+
+            const label = document.createElement('span');
+            label.style.flex = '1';
+            label.style.fontSize = '12px';
+            label.textContent = `${getIcon(tag)} ${tag}`;
+            
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'flex-container gap-1';
+
+            const upBtn = document.createElement('button');
+            upBtn.className = 'menu_button interactable rt-order-btn';
+            upBtn.style.padding = '2px 6px';
+            upBtn.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
+            upBtn.disabled = index === 0;
+            upBtn.onclick = () => {
+                const newOrder = [...order];
+                [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                s.blockOrder = newOrder;
+                SillyTavern.getContext().saveSettingsDebounced();
+                refreshOrderList();
+                refreshRenderedView();
+            };
+
+            const downBtn = document.createElement('button');
+            downBtn.className = 'menu_button interactable rt-order-btn';
+            downBtn.style.padding = '2px 6px';
+            downBtn.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+            downBtn.disabled = index === order.length - 1;
+            downBtn.onclick = () => {
+                const newOrder = [...order];
+                [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+                s.blockOrder = newOrder;
+                SillyTavern.getContext().saveSettingsDebounced();
+                refreshOrderList();
+                refreshRenderedView();
+            };
+
+            btnGroup.appendChild(upBtn);
+            btnGroup.appendChild(downBtn);
+            item.appendChild(label);
+            item.appendChild(btnGroup);
+            list.appendChild(item);
+        });
+    }
+
     /**
      * Initialization
      */
@@ -1787,8 +1922,11 @@
                 ctx.saveSettingsDebounced();
             });
 
+            // Initial order list refresh
+            refreshOrderList();
+
             const modPrefix = '#rpg_tracker_mod_';
-            ['character', 'party', 'combat', 'inventory', 'abilities', 'spells'].forEach(mod => {
+            ['character', 'party', 'combat', 'inventory', 'abilities', 'spells', 'time', 'xp'].forEach(mod => {
                 $(modPrefix + mod).prop('checked', settings.modules[mod]).on('change', function () {
                     settings.modules[mod] = !!$(this).prop('checked');
                     ctx.saveSettingsDebounced();
@@ -1829,7 +1967,18 @@
                 const freshSettings = getSettings(); // re-merges defaults
                 $('#rpg_tracker_core_prompt').val(freshSettings.systemPromptTemplate);
                 ctx.saveSettingsDebounced();
-                toastr['success']('Prompt reset to default.', 'RPG Tracker');
+                toastr['success']('Core prompt reset to default.', 'RPG Tracker');
+            });
+
+            $('#rpg_tracker_btn_reset_all_prompts').on('click', function () {
+                if (!confirm('This will reset the Core Prompt AND all Module Prompts to their factory defaults. This cannot be undone. Proceed?')) return;
+                const { extensionSettings } = SillyTavern.getContext();
+                delete extensionSettings[MODULE_NAME].systemPromptTemplate;
+                delete extensionSettings[MODULE_NAME].stockPrompts;
+                const freshSettings = getSettings();
+                $('#rpg_tracker_core_prompt').val(freshSettings.systemPromptTemplate);
+                ctx.saveSettingsDebounced();
+                toastr['success']('All prompts reset to factory defaults.', 'RPG Tracker');
             });
 
             $('#rpg_tracker_btn_update').on('click', async function () {

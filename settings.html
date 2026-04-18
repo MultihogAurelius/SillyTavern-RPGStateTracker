@@ -125,6 +125,30 @@
                     </label>
                     <button class="menu_button interactable rt-view-stock-prompt" data-mod="spells" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
                 </div>
+                
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_time" type="checkbox" />
+                        <span>Time Tracking</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="time" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <div class="flex-container gap-1 alignitemscenter">
+                    <label class="checkbox_label" style="flex: 1;">
+                        <input id="rpg_tracker_mod_xp" type="checkbox" />
+                        <span>Experience Points</span>
+                    </label>
+                    <button class="menu_button interactable rt-view-stock-prompt" data-mod="xp" title="View Default Prompt"><i class="fa-solid fa-lightbulb"></i></button>
+                </div>
+
+                <hr>
+                <b>Module Order</b>
+                <small>Change the order in which sections appear in the tracker view.</small>
+                <div id="rpg_tracker_order_list" class="flex-container flexFlowColumn gap-1" style="margin-top: 5px;">
+                    <!-- Populated by JS -->
+                </div>
+
                 <hr>
                 <b>Custom Fields</b>
                 <small>Define custom tracking sections for the model to parse.</small>
@@ -137,7 +161,10 @@
                 <small>Edit the prompt logic the State Model uses. Use <code>{{modulesText}}</code> to inject the active module guidelines.</small>
                 <textarea id="rpg_tracker_core_prompt" class="text_pole autoSetHeight" rows="5"></textarea>
                 <button id="rpg_tracker_btn_reset_prompt" class="menu_button interactable" style="align-self: flex-start; margin-top: 4px;">
-                    <i class="fa-solid fa-arrow-rotate-left"></i> Reset to Default
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Reset Core Prompt
+                </button>
+                <button id="rpg_tracker_btn_reset_all_prompts" class="menu_button interactable" style="align-self: flex-start; margin-top: 4px;">
+                    <i class="fa-solid fa-broom"></i> Reset ALL Prompts (Core + Modules)
                 </button>
 
                 <hr>

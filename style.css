@@ -476,6 +476,18 @@
     white-space: nowrap;
 }
 
+.rt-combat-round {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--rt-accent);
+    padding: 6px 0;
+    text-align: center;
+    border-bottom: 1px solid var(--rt-accent-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
 .rt-slot-pips {
     display: flex;
     align-items: center;
@@ -596,6 +608,35 @@
     border-radius: 12px;
     padding: 2px 9px;
     font-size: 11px;
+}
+
+/* XP Bar */
+.rt-xp-row {
+    padding: 4px 0;
+}
+
+.rt-xp-label {
+    font-size: 10px;
+    color: var(--rt-text-muted);
+    margin-bottom: 3px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.rt-xp-bar-wrap {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rt-xp-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #0088ff, #00d4ff);
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 0 10px rgba(0, 136, 255, 0.4);
 }
 
 /* Character KV pairs */
