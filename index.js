@@ -17,8 +17,8 @@
     let _stateModelRunning = false;
 
     const DEFAULT_STOCK_PROMPTS = {
-        character: "Main character's core stats, class (and possible subclass), current Level, current HP, active statuses/buffs (with durations). Buffs/debuffs should be reported as time remaining, with the buff/debuff's effect, e.g. \"Mage Armor (+2 AC, 2h 0m)\" Round-based buffs/debuffs should be reported as \"X rounds.\" This remaining time should then tick down based on elapsed time or rounds.\n\nUpon LEVEL UP, if you see an increase in stats (e.g. +2 CON,) incorporate the change in attributes.\n\nExample block: [CHARACTER]\nValerius (Fighter — Echo Knight): 22/28 HP | AC: 16\nLevel 3 | STR 16, DEX 12, CON 14, INT 10, WIS 12, CHA 10\nSkills: Sleight of Hand +4\nStatus: Mage Armor (+2 AC, 8h 0m)\n[/CHARACTER]",
-        party: "Companion/Party members, their current HP, and active statuses/buffs.\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nExample party: [PARTY]Elara: 26/45 HP | AC: 15 Status: Bleeding (2 turns)\nSkills: Athletics +3, Intimidation +6\n\nMara: 12/44 HP | AC 23, Status: Strong (54 minutes)\nSkills: Sleight of Hand +2[/PARTY]",
+        character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class - Possible Subclass): current/max HP | AC: Z | Primary Weapon (stats)\nAttributes: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nStatus: Effect (duration)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
+        party: "Companion/Party members. Use this format for each member:\nName: current/max HP | AC: Z | Primary Weapon (stats)\nAttributes: STR X... (etc)\nSkills: Skill1 +X... (etc)\nStatus: Effect (duration)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nExample party: [PARTY]Elara: 26/45 HP | AC: 15 | Shortbow (+5 / 1d6+3 / Piercing)\nAttributes: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSkills: Athletics +3, Perception +5\nStatus: Bleeding (-2HP/turn, 2 turns)\n\nMara: 12/44 HP | AC 23 | Mace (+4 / 1d6+2 / Bludgeoning)\nAttributes: STR 18, DEX 10, CON 16, INT 8, WIS 10, CHA 8\nSkills: Intimidation +4\nStatus: Strong (+3 attack, 54 minutes)[/PARTY]",
         combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Status: ...`. Update HP inline. You MUST output `[COMBAT]REMOVED[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
@@ -830,7 +830,7 @@
                         const hasMax = max !== undefined;
                         const pct = hasMax ? Math.max(0, Math.min(100, (Number(cur) / Number(max)) * 100)) : 100;
                         const hpColor = !hasMax ? '#00ffaa' : pct > 60 ? '#00ffaa' : pct > 30 ? '#ffaa00' : '#ff5555';
-                        const status = rest.trim();
+                        const status = rest.trim().replace(/^\|\s*/, '');
                         const label = hasMax ? `${cur}/${max}` : `${cur}`;
 
                         lastEntityIdx = results.length;
@@ -842,13 +842,32 @@
                             <span class="rt-hp-label">${label}</span>
                             ${status ? `<span class="rt-status">${escapeHtml(status)}</span>` : ''}
                         </div>`);
-                    } else if (line.toLowerCase().startsWith('skills:') && lastEntityIdx !== -1) {
+                    } else if (line.toLowerCase().startsWith('attributes:') && lastEntityIdx !== -1) {
+                        const attrText = line.substring(11).trim();
+                        const attrHtml = `<div class="rt-entity-sub-line rt-entity-attributes">
+                            <span class="rt-entity-sub-label">Attr:</span> ${escapeHtml(attrText)}
+                        </div>`;
+                        results[lastEntityIdx] += attrHtml;
+                    } else if ((line.toLowerCase().startsWith('skills:') || line.toLowerCase().startsWith('key skills:')) && lastEntityIdx !== -1) {
                         // Append bundled skills below the entity row
-                        const skillsText = line.substring(7).trim();
-                        const skillsHtml = `<div class="rt-card-line" style="font-size: 10px; opacity: 0.8; padding-left: 5px; margin-top: -3px; margin-bottom: 2px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 2px;">
-                            <span style="color: var(--rt-text-muted)">Skills:</span> ${escapeHtml(skillsText)}
+                        const skillsMatch = line.match(/^(?:key\s+)?skills:\s*(.+)$/i);
+                        const skillsText = skillsMatch ? skillsMatch[1].trim() : line.split(':')[1]?.trim() || '';
+                        const skillsHtml = `<div class="rt-entity-sub-line">
+                            <span class="rt-entity-sub-label">Skills:</span> ${escapeHtml(skillsText)}
                         </div>`;
                         results[lastEntityIdx] += skillsHtml;
+                    } else if (line.toLowerCase().startsWith('status:') && lastEntityIdx !== -1) {
+                        const statusText = line.substring(7).trim();
+                        const statusHtml = `<div class="rt-entity-sub-line">
+                            <span class="rt-entity-sub-label" style="color: #ffaa00">Status:</span> <span style="color: #ffaa00; font-weight: 600;">${escapeHtml(statusText)}</span>
+                        </div>`;
+                        results[lastEntityIdx] += statusHtml;
+                    } else if (line.toLowerCase().startsWith('primary weapon:') && lastEntityIdx !== -1) {
+                        const weaponText = line.substring(15).trim();
+                        const weaponHtml = `<div class="rt-entity-sub-line">
+                            <span class="rt-entity-sub-label">Weapon:</span> ${escapeHtml(weaponText)}
+                        </div>`;
+                        results[lastEntityIdx] += weaponHtml;
                     } else {
                         results.push(`<div class="rt-card-line">${escapeHtml(line)}</div>`);
                         lastEntityIdx = -1;
