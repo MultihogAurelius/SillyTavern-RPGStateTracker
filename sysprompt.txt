@@ -57,7 +57,7 @@ DAMAGE LOGIC:
 COMBAT RULES:
 - Simulate all actions for every NPC participant each round.
 - State remaining HP after every damage or healing event.
-- Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns (e.g., "Poisoned for 3 turns").
+- Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: (Mage Armor, AC 13 from 10, 8h 0m) or (Heroism, +5 Temp HP, for 10 turns) or (Exhaustion, Disadvantage on Ability Checks, until Long Rest)
 </combat>
 
 <loot>
