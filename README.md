@@ -32,6 +32,8 @@ The RNG Queue is a deliberate choice over tool-calling. While agents and tool ca
 
 **My System Prompt**: I recommend using at least parts of the sysprompt.txt. It contains a lot of the logic/output this extension relies on to work properly, such as the time/status footer and the buff temporal logic.
 
+**[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** This is a brilliant summarizer/context compression extension.
+
 ## Installation
 
 1. Copy the `RPG Tracker` folder into your `SillyTavern/public/scripts/extensions/third-party/` directory.
