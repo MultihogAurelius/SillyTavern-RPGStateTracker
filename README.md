@@ -27,7 +27,7 @@ This extension is designed to work as one half of a two-part simulation system. 
 
 - **[Prompt Injection RNG](https://github.com/MultihogAurelius/Context-Injection-RNG-for-DnD):** This extension injects a deterministic queue of pre-rolled dice (D20, D4, D6, etc.) into the prompt. While **RPG Tracker** maintains the results (your HP, level, and items), **Prompt Injection RNG** provides the "luck" required for the narrative engine to decide those outcomes without manual player intervention.
 
-**The Benefit of Seamlessness**: The RNG Queue is a deliberate choice over tool-calling. While agents and tool calls are flashy, they are prone to failure and latency. This system uses a "Deterministic Physics Buffer"—it is 100% reliable and zero-latency. It also avoids the problem of rigid boundaries between non-combat and combat. The user is able to mix combat and non-combat (or "narrative") actions as much as they please because the system is completely unshackled from any rigid modes.
+**Reliable and Seamless**: The RNG Queue is a deliberate choice over tool-calling. While agents and tool calls are flashy, they are prone to failure and latency. This system uses a "Deterministic Physics Buffer"—it is 100% reliable and zero-latency. It also avoids the problem of rigid boundaries between non-combat and combat. The user is able to mix combat and non-combat (or "narrative") actions as much as they please because the system is completely unshackled from any rigid modes.
 
 **My System Prompt**: I recommend using at least parts of the sysprompt.txt. It contains a lot of the logic/output this extension relies on to work properly, such as the time/status footer and the buff temporal logic.
 
