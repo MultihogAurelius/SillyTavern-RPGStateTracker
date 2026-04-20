@@ -20,8 +20,7 @@ The State Model functions both as a "cheat sheet" for the AI as well as a UI for
 - **Connection Integration:** Leverages SillyTavern's connection profiles and presets system. It can automatically switch to a different model/preset just for the state extraction pass, and revert back to your preferred creative model for the next narrative response. Useful, since many prefer using a non-reasoning model for narrative output, but a reasoning model will likely be more reliable when extracting the state/memo information from the output.
 - **Manual Update (🔄️):** Request a state update at any time, either a regular one or a full context parsing.
 
-<img width="853" height="1631" alt="image" src="https://github.com/user-attachments/assets/ab805c00-ecbc-4d68-b53f-4fad8140a033" />
-
+<img width="511" height="978" alt="image" src="https://github.com/user-attachments/assets/1e0f3c20-6c2a-44b3-8b0a-eeb21565657b" />
 
 ## Suggested Companions
 
