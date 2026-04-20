@@ -126,6 +126,8 @@ the player can request anything not listed.
 [List names]: Level up to [X].
 [For each member, list ONLY changes]:
 - [Name]: +[X] HP | [New Skill or +1 to Primary Attack/DC]
+
+Party members grow in lockstep with {{user}}, but they do not have explicit levels. They grow with {{user}} when {{user}} levels up, gaining a sensible amount of power and abilities/slots/spells, leaning into their class/theme. Use your own judgment.
 </level_up_protocol>
 
 <narrative>
@@ -151,9 +153,18 @@ END OF EACH OUTPUT (required):
 <party_members>
 When a character joins/leaves, explicitly state (Name joins/leaves the party).
 Declare their COMBAT PROFILE immediately:
-- AC and Max HP.
+- Worn armor, AC, and Max HP.
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
+- Spell slots for each level (if applicable.)
+
+Format:
+Brickhard (Barbarian): 35/35 HP
+Att/def: Fists (+5 / 1d4+3 Bludgeoning) | Unarmored Defense (AC: 17 from 15)
+Attr: STR 17, DEX 12, CON 16, INT 6, WIS 8, CHA 8
+Skills: Athletics +7, Persuasion -4, Stealth -8
+Traits: Extra Attack (attack twice with normal attacks)
+Status: Healthy
 </party_members>
 
 <constraints>

@@ -17,8 +17,8 @@
     let _stateModelRunning = false;
 
     const DEFAULT_STOCK_PROMPTS = {
-        character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
-        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nStatus: Effect (duration Xh Xm)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain), Archery Style (+2 attack with ranged)\nStatus: Healthy\n[/PARTY]",
+        character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Level N (avail/max): Spell1, Spell2\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
+        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Level N (avail/max)\nStatus: Effect (duration Xh Xm)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Level 1 (2/2)\nStatus: Healthy\n[/PARTY]",
         combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Status: ...`. Update HP inline. You MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.\n\nExample:\n[INVENTORY]\n- Data-crystal\n- 1,000 GP\n[/INVENTORY]",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
@@ -72,8 +72,9 @@
                 "   XP: 100/300\n" +
                 "   [/XP]\n\n" +
                 "4. Omit unchanged sections entirely. Do NOT output a section if its contents did not change.\n" +
-                "5. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
-                "6. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n\n" +
+                "5. BLOCK PERSISTENCE: For list-based sections ([PARTY], [INVENTORY], [ABILITIES], [SPELLS], [COMBAT]), if any single item within that section changes, you MUST re-output the ENTIRE section containing all items. Never omit existing members or items unless they are explicitly logically removed.\n" +
+                "6. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
+                "7. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n\n" +
                 "REGARDING COMBAT:\n" +
                 "1. [COMBAT] section is only created when actual combat begins, not when enemies are simply present in the scene.\n" +
                 "2. If an entity dies in combat, output it as 0/X HP, for example \"Shambling Corpse B (Fodder): 0/9 HP | AC: 10,\" do not omit it completely from the next state.\n\n" +
@@ -922,6 +923,44 @@
                             <span class="rt-entity-sub-label">Traits:</span> <span class="rt-entity-traits">${highlightParens(escapeHtml(traitsText))}</span>
                         </div>`;
                         results[lastEntityIdx] += traitsHtml;
+                    } else if (line.toLowerCase().startsWith('spells:') && lastEntityIdx !== -1) {
+                        const startIdx = line.indexOf(':') + 1;
+                        const spellLine = line.substring(startIdx).trim();
+                        // Support shared spell rendering logic for companions
+                        const m = spellLine.match(/^(Level\s*\d+|Cantrips?)\s*(?:\((\d+)\/(\d+)[^)]*\))?\s*(?::\s*(.+))?$/i);
+                        if (m) {
+                            const [, label, availStr, maxStr, spellList] = m;
+                            const isCantrip = /cantrip/i.test(label);
+                            let pipsHtml = '';
+                            if (!isCantrip && availStr !== undefined && maxStr !== undefined) {
+                                const avail = parseInt(availStr, 10), max = parseInt(maxStr, 10);
+                                const pips = Array.from({ length: max }, (_, i) =>
+                                    `<span class="rt-slot-pip${i < avail ? ' rt-slot-available' : ' rt-slot-used'}"></span>`
+                                ).join('');
+                                pipsHtml = `<span class="rt-slot-pips">${pips}</span>`;
+                            }
+                            let spellsHtml = '';
+                            if (spellList) {
+                                const spells = spellList.split(',').map(s => {
+                                    const name = s.trim();
+                                    const slug = name.toLowerCase().replace(/'/g, '').replace(/[^a-z0-9]+/g, '-');
+                                    const url = `https://dnd5e.wikidot.com/spell:${slug}`;
+                                    return `<a href="${url}" target="_blank" class="rt-spell-name" title="View spell on Wikidot">${escapeHtml(name)}</a>`;
+                                }).join('');
+                                spellsHtml = `<div class="rt-spell-list" style="margin-left: 4px;">${spells}</div>`;
+                            }
+                            
+                            const rowHtml = `<div class="rt-entity-sub-line rt-spell-row" style="margin-top: 2px;">
+                                <span class="rt-entity-sub-label">Spells:</span>
+                                <span class="rt-spell-level" style="font-size: 9px; opacity: 0.7;">${escapeHtml(label.trim())}</span>
+                                ${pipsHtml}
+                                ${spellsHtml}
+                            </div>`;
+                            results[lastEntityIdx] += rowHtml;
+                        } else {
+                            // Fallback if model format is loose
+                            results[lastEntityIdx] += `<div class="rt-entity-sub-line"><span class="rt-entity-sub-label">Spells:</span> ${highlightParens(escapeHtml(spellLine))}</div>`;
+                        }
                     } else {
                         results.push(`<div class="rt-card-line">${escapeHtml(line)}</div>`);
                         lastEntityIdx = -1;
