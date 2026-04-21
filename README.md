@@ -32,8 +32,7 @@ This framework is highly optimized for complex play. For the complete experience
 
 ## Installation
 
-1. Copy the `SillyTavern-RPGStateTracker` folder into your `SillyTavern/public/scripts/extensions/third-party/` directory.
-   - Example path: `SillyTavern/public/scripts/extensions/third-party/SillyTavern-RPGStateTracker/index.js`
+1. Copy the `SillyTavern-FatbodyDnDFramework` folder into your `SillyTavern/public/scripts/extensions/third-party/` directory.
 2. Refresh your SillyTavern browser tab.
 3. Click the Extensions menu icon and configure **Fatbody D&D Framework** settings.
 
