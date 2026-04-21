@@ -21,7 +21,7 @@ The State Model functions both as a "cheat sheet" for the AI as well as a UI for
 - **Archetype Onboarding:** Don't have a character sheet? Use the quick-start buttons to generate a random **Magic User**, **Melee Fighter**, or **Rogue** instantly.
 - **SYSPROMPT Button:** Quickly copy the Narrator's system prompt (including combat and save rules) directly from the tracker footer.
 
-<img width="1539" height="981" alt="Screenshot 2026-04-21 203412" src="https://github.com/user-attachments/assets/df73f6f6-a8d0-4c20-b4fb-1658dc3ef451" />
+<img width="2154" height="1374" alt="Screenshot 2026-04-21 203412" src="https://github.com/user-attachments/assets/ba716910-401f-4e98-9836-5ae68510b43f" />
 
 
 ## Suggested Companions
