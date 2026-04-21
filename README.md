@@ -36,8 +36,8 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 This framework is highly optimized for complex play. For the complete experience, I recommend:
 
-- **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
-- **My System Prompt**: Click the `SYSPROMPT` button in the framework UI. It contains the logic/output rules this extension relies on to work properly, such as the time/status footer and buff temporal rules.
+- 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
+- 📜 **My System Prompt**: Click the `SYSPROMPT` button in the framework UI. It contains the logic/output rules this extension relies on to work properly, such as the time/status footer and buff temporal rules.
 
 ## Installation
 
