@@ -16,8 +16,6 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 ## Features
 
-- **Integrated RNG Physics Engine:** Now built-in! Dice roll queues (D20, D4, D6, etc.) are automatically injected into your outgoing prompt. This provides a deterministic "physics buffer" that ensures 100% reliable luck for your narrative engine without latency or tool-calling failure.
-- **Dynamic State Extraction:** Analyzes the narrative output and updates a structured "State Memo" behind the scenes without polluting the chat log.
 - **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
   - The extension provides customizable stock fields: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
   - **Custom Fields:** Define entirely new, arbitrary tags (e.g., `[QUESTS]`, `[RELATIONSHIPS]`). Assign them custom emoji icons, specific rendering styles (HP bars, pips, line-items, or pills), and unique extraction prompt logic.
