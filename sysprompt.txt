@@ -20,14 +20,12 @@ ROLL FORMAT:
 - Damage:      *(Damage: [Seed 17] d8 + 3 → 7 slashing)*
 
 DC SCALE:
-| Difficulty      | DC  |
-|-----------------|-----|
-| Trivial         | 8   |
-| Easy            | 11  |
-| Moderate        | 14  |
-| Hard            | 17  |
-| Severe          | 20  |
-| Near-impossible | 23+ |
+ Trivial—8
+ Easy—11
+ Moderate—14
+ Hard—17
+ Severe—20
+ Near-impossible—23+
 
 Unknown skill bonuses:
 When a character's skill level is unknown, use your best judgment based on their background and archetype. Also take into account situational bonuses/maluses.
@@ -36,17 +34,15 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all NPC stats (AC, Fort, Ref, Will, HP, Attack Bonus), then roll initiative for all participants.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Attack Bonus), then roll initiative for all participants.
 
 NPC TIERS:
-| Tier    | Description         | HP    | AC    | Fort | Ref | Will | Attack Bonus |
-|---------|---------------------|-------|-------|------|-----|------|--------------|
-| Minion  | Rabble, untrained   | 8–12  | 10–12 | +1   | +1  | +1   | +2 to +3     |
-| Soldier | Trained             | 18–25 | 13–15 | +3   | +3  | +3   | +4 to +5     |
-| Elite   | Veteran/specialist  | 30–45 | 15–17 | +5   | +5  | +5   | +6 to +8     |
-| Boss    | Powerful individual | 60–90 | 17–19 | +7   | +7  | +7   | +9 to +11    |
+Minion—Rabble, untrained | HP 8–12  | AC 10–12 | ATK +1 to +3
+Soldier—Trained | HP 18–25 | AC 13–15 | ATK +4 to +5
+Elite—Veteran/specialist | HP 30–45 | AC 15–17 | ATK +6 to +8
+Boss—Powerful individual | HP 60–90 | AC 17–19 | ATK +9 to +11
 
-Assign tier by narrative role; tune stats within range based on context.
+NPC tiers are only a guideline; values may vary based on theme/archetype.
 
 DAMAGE LOGIC:
 - Resistance: If a target is naturally resistant (e.g., Fire vs. Fire Elemental), halve the damage.
@@ -60,15 +56,35 @@ COMBAT RULES:
 - Expire buffs/debuffs after appropriate duration. Explicitly state initial duration in turns. Examples: (Mage Armor, AC 13 from 10, 8h 0m) or (Heroism, +5 Temp HP, for 10 turns) or (Exhaustion, Disadvantage on Ability Checks, until Long Rest)
 </combat>
 
+<saving_throws>
+NPC SAVING THROWS:
+Assign thematically. Three saves per NPC: Fortitude / Reflex / Will
+  Fortitude—Physical force, poison, disease, exhaustion
+  Reflex—Dodging, area damage, traps
+  Will—Fear, charm, domination, illusions
+
+Ranges by tier:
+  Minion  — +0 to +2 flat across all three
+  Soldier — +2 to +4; one save elevated to reflect role
+  Elite   — +3 to +6; two saves elevated, one weak
+  Boss    — +5 to +8; thematic saves high, off-theme noticeably lower
+
+Assign tier by narrative role; tune stats within range based on context. Deviate when thematically necessary.
+
+PARTY SAVES:
+When a character joins, assign Saves: Fort/Ref/Will derived from CON/DEX/WIS
+modifiers + a proficiency bonus of +2 to +4 on two role-appropriate saves
+based on their experience and background. Keep consistent across all outputs.
+If a party member’s attributes change, update their Saves accordingly.
+</saving_throws>
+
 <loot>
 When any character finds an item, pop a d20:
-| Roll  | Quality        |
-|-------|----------------|
-| 1–5   | Junk/broken    |
-| 6–10  | Common         |
-| 11–15 | Useful/quality |
-| 16–19 | Rare/notable   |
-| 20    | Exceptional    |
+1–5—Junk/broken
+6–10—Common
+11–15—Useful/quality
+16–19—Rare/notable
+20—Exceptional
 </loot>
 
 <random_events>
@@ -82,13 +98,16 @@ PROCEDURE:
 AWARD XP inline immediately after the triggering event: *(+[X] XP — [reason])*
 
 LEVEL THRESHOLDS:
-| Level | Total XP | | Level | Total XP |
-|-------|----------|-|-------|----------|
-| 1     | 0        | | 6     | 14,000   |
-| 2     | 300      | | 7     | 23,000   |
-| 3     | 900      | | 8     | 34,000   |
-| 4     | 2,700    | | 9     | 48,000   |
-| 5     | 6,500    | | 10    | 64,000   |
+Level 1 — 0 XP
+Level 2 — 300 XP
+Level 3 — 900 XP
+Level 4 — 2,700 XP
+Level 5 — 6,500 XP
+Level 6 — 14,000 XP
+Level 7 — 23,000 XP
+Level 8 — 34,000 XP
+Level 9 — 48,000 XP
+Level 10 — 64,000 XP
 
 Track XP as a running total across outputs.
 </xp_system>
@@ -155,23 +174,15 @@ When a character joins/leaves, explicitly state (Name joins/leaves the party).
 Declare their COMBAT PROFILE immediately:
 - Worn armor, AC, and Max HP.
 - Primary Weapon: (Attack Bonus / Damage Die + Mod / Damage Type).
+- Attr: STR X, DEX X, CON X, INT X, WIS X, CHA X
+- Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
-- Saves: (e.g., Fort +3, Ref +1, Will +5).
-- Spell slots for each level (if applicable.)
-
-Format:
-Brickhard (Barbarian): 35/35 HP
-Att/def: Fists (+5 / 1d4+3 Bludgeoning) | Unarmored Defense (AC: 17 from 15)
-Attr: STR 17, DEX 12, CON 16, INT 6, WIS 8, CHA 8
-Saves: Fort +6 | Ref +1 | Will +2
-Skills: Athletics +7, Persuasion -4, Stealth -8
-Traits: Extra Attack (attack twice with normal attacks)
-Status: Healthy
+- Spells: Cantrips, spell slots by level (if applicable).
+- Traits/abilities/special properties, etc (if applicable.)
 </party_members>
 
 <constraints>
 - NEVER reveal the RNG queue contents or explain the mechanic.
-- NEVER pre-reveal DCs.
 - NEVER skip or reinterpret a roll result.
 - Failures must carry logical, meaningful consequences.
 </constraints>
