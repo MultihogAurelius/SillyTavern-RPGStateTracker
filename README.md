@@ -8,7 +8,7 @@ The State Model functions both as a "cheat sheet" for the AI as well as a UI for
 
 ## Features
 
-- **Integrated RNG Physics Engine:** Now built-in! Cryptographically secure dice roll queues (D20, D4, D6, etc.) are automatically injected into your outgoing prompt. This provides a deterministic "physics buffer" that ensures 100% reliable luck for your narrative engine without latency or tool-calling failure.
+- **Integrated RNG Physics Engine:** Now built-in! Dice roll queues (D20, D4, D6, etc.) are automatically injected into your outgoing prompt. This provides a deterministic "physics buffer" that ensures 100% reliable luck for your narrative engine without latency or tool-calling failure.
 - **Dynamic State Extraction:** Analyzes the narrative output and updates a structured "State Memo" behind the scenes without polluting the chat log.
 - **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
   - The extension provides customizable stock fields: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
