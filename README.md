@@ -34,8 +34,6 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 ## Suggested Companions
 
-This framework is highly optimized for complex play. For the complete experience, I recommend:
-
 - 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
 
 ## Installation
