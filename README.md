@@ -17,7 +17,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 ## Features
 
 - **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
-  - The extension provides customizable stock fields: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
+  - The extension provides customizable stock fields such as: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
   - **Custom Fields:** Define entirely new, arbitrary tags (e.g., `[QUESTS]`, `[RELATIONSHIPS]`). Assign them custom emoji icons, specific rendering styles (HP bars, pips, line-items, or pills), and unique extraction prompt logic.
   - **Editable Logic:** The prompt instruction for every field can be edited in settings to fit your campaign's rules.
 - **Rendered HUD:** A draggable, dynamic floating panel presenting the state as organized, paginated cards (with visual HP bars and spell slot pips). Toggle between "Rendered View" and "Raw View" at any time.
