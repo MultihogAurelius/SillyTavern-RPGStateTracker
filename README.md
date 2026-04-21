@@ -27,7 +27,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 - **Archetype Onboarding:** Don't have a character sheet? Use the quick-start buttons to generate a random **Magic User**, **Melee Fighter**, or **Rogue** instantly.
 - **SYSPROMPT Button:** Quickly copy the Narrator's system prompt (including combat and save rules) directly from the tracker footer.
 - **Mobile Support:** Continue where you left off on your phone. Host your session with the Remote-Link .bat file in the ST directory, and play on the bus.
-- **Real-Time Buff Tracking:** The system prompt together with the RPG State Tracker track buffs in real-time. The system prompt puts a timestamp footer into each output. By calculating the delta between time stamps, the tracker subtracts Xh Xm from any buff.
+- **Real-Time Buff Tracking:** Buff/debuff temporal decay via [TIME] delta tracking.
 
 <img width="2154" height="1374" alt="Screenshot 2026-04-21 203412" src="https://github.com/user-attachments/assets/ba716910-401f-4e98-9836-5ae68510b43f" />
 
