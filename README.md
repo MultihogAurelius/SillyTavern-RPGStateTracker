@@ -9,7 +9,7 @@ What this framework does is essentially turn SillyTavern into something like AI 
 ### The Fatbody D&D Framework involves three core components:
 
 1. 🖥️ **RPG State Tracker** — Extracts and maintains HP, inventory, party, buffs, XP, spells, and more via a dedicated second-pass model. Injects a rolling State Memo back into each prompt to keep the AI (and you) on track.
-2. :game_die: **Context Injection RNG** — Feeds a pre-seeded deterministic dice queue into every turn. More reliable than tool calls, zero-latency, and works seamlessly across combat and non-combat in the same context. Do anything in combat, be creative; there are no rigid constraints like dedicated combat modes have, but you are still impacted by the gravity of the dice.
+2. :game_die: **Context Injection RNG** — Feeds a pre-seeded deterministic dice queue into every turn. More reliable than tool calls, zero-latency, and works seamlessly across combat and non-combat in the same context. Do anything in combat, be creative; there are no rigid constraints like dedicated combat modes have, but you are still impacted by the gravity of the dice and your stats/skills.
 3. :scroll: **sysprompt.txt** — Required for the AI to understand the RNG system, buff/temporal logic, RVI damage, level-up, and consistent output structure. Plug & play, but modify at will. Can also be copied from the UI.
 
 Together they solve the two core problems of LLM tabletop RP: the AI forgets your inventory, spells, etc., and you always win.
