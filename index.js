@@ -17,9 +17,9 @@
     let _stateModelRunning = false;
 
     const DEFAULT_STOCK_PROMPTS = {
-        character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Level N (avail/max): Spell1, Spell2\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
-        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Level N (avail/max)\nStatus: Effect (duration Xh Xm)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Level 1 (2/2)\nStatus: Healthy\n[/PARTY]",
-        combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Status: ...`. Update HP inline. You MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
+        character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
+        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Level N (avail/max)\nStatus: Effect (duration Xh Xm)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSaves: Fort +3 | Ref +5 | Will +2\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Level 1 (2/2)\nStatus: Healthy\n[/PARTY]",
+        combat: "Active enemies/NPCs in combat, their HP, and current statuses/debuffs (with durations). Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. When combat starts, capture each combatant as: `Name: X/Y HP | AC: Z | Saves: Fort +S, Ref +S, Will +S | Status: ...`. Update HP inline. You MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.\n\nExample:\n[INVENTORY]\n- Data-crystal\n- 1,000 GP\n[/INVENTORY]",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
         spells: "Spell slots and spells known, grouped by level. Format each line as: `Level N (avail/max): Spell1, Spell2`. Track slot usage accurately. NEVER mix these with abilities.",
@@ -63,10 +63,11 @@
                 "   [CHARACTER]\n" +
                 "   Eliel: 8/8 HP | AC: 12\n" +
                 "   Level 1 | STR 8, DEX 14, CON 14\n" +
+                "   Saves: Fort +4 | Ref +2 | Will -1\n" +
                 "   [/CHARACTER]\n\n" +
                 "   [COMBAT]\n" +
                 "   Combat Round 1\n" +
-                "   Goblin: 7/7 HP | AC: 15\n" +
+                "   Goblin: 7/7 HP | AC: 15 | Saves: Fort +1, Ref +2, Will +0 | Status: Healthy\n" +
                 "   [/COMBAT]\n\n" +
                 "   [XP]\n" +
                 "   XP: 100/300\n" +
@@ -883,9 +884,33 @@
                         </div>`);
                         
                         if (status) {
-                            results[lastEntityIdx] += `<div class="rt-entity-sub-line">
-                                <span class="rt-entity-sub-label">Info:</span> ${highlightParens(escapeHtml(status))}
-                            </div>`;
+                            // Split inline status by pipe to find AC, Saves, etc.
+                            const parts = status.split('|').map(p => p.trim()).filter(Boolean);
+                            let genericInfo = [];
+
+                            for (const part of parts) {
+                                if (part.toLowerCase().startsWith('ac:')) {
+                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line">
+                                        <span class="rt-entity-sub-label">AC:</span> ${escapeHtml(part.substring(3).trim())}
+                                    </div>`;
+                                } else if (part.toLowerCase().startsWith('saves:')) {
+                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line">
+                                        <span class="rt-entity-sub-label">Saves:</span> ${highlightParens(escapeHtml(part.substring(6).trim()))}
+                                    </div>`;
+                                } else if (part.toLowerCase().startsWith('status:')) {
+                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line">
+                                        <span class="rt-entity-sub-label">Status:</span> ${highlightParens(escapeHtml(part.substring(7).trim()))}
+                                    </div>`;
+                                } else {
+                                    genericInfo.push(part);
+                                }
+                            }
+
+                            if (genericInfo.length > 0) {
+                                results[lastEntityIdx] += `<div class="rt-entity-sub-line">
+                                    <span class="rt-entity-sub-label">Info:</span> ${highlightParens(escapeHtml(genericInfo.join(' | ')))}
+                                </div>`;
+                            }
                         }
                     } else if ((line.toLowerCase().startsWith('attributes:') || line.toLowerCase().startsWith('attr:')) && lastEntityIdx !== -1) {
                         const label = line.toLowerCase().startsWith('attr:') ? 'Attr:' : 'Attr:';
@@ -903,6 +928,13 @@
                             <span class="rt-entity-sub-label">Skills:</span> ${escapeHtml(skillsText)}
                         </div>`;
                         results[lastEntityIdx] += skillsHtml;
+                    } else if (line.toLowerCase().startsWith('saves:') && lastEntityIdx !== -1) {
+                        const startIdx = line.indexOf(':') + 1;
+                        const savesText = line.substring(startIdx).trim();
+                        const savesHtml = `<div class="rt-entity-sub-line">
+                            <span class="rt-entity-sub-label">Saves:</span> ${highlightParens(escapeHtml(savesText))}
+                        </div>`;
+                        results[lastEntityIdx] += savesHtml;
                     } else if (line.toLowerCase().startsWith('status:') && lastEntityIdx !== -1) {
                         const statusText = line.substring(7).trim();
                         const statusHtml = `<div class="rt-entity-sub-line">
@@ -1050,6 +1082,11 @@
                 <div class="rt-empty-icon">📜</div>
                 <div>Create a character to get started.</div>
                 <small>Stats, inventory, and abilities will be recorded automatically from chat. You can also click the 💬 icon to prompt for character creation or paste them in Raw view.</small>
+                <div class="rt-onboarding-buttons">
+                    <button class="rt-random-char-btn" data-archetype="magic">✨ Magic User</button>
+                    <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee Fighter</button>
+                    <button class="rt-random-char-btn" data-archetype="rogue">🗡️ Rogue / Thief</button>
+                </div>
             </div>`;
         }
         const blocks = parseMemoBlocks(memo);
@@ -1138,6 +1175,22 @@
     }
 
     function bindRenderedCardEvents(el, memo, isDetachedContext = false) {
+        el.querySelectorAll('.rt-random-char-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const archetype = btn.dataset.archetype;
+                const labels = { magic: '✨ Casting...', melee: '⚔️ Training...', rogue: '🗡️ Sneaking...' };
+                const prompts = {
+                    magic: "Generate a random D&D Magic User (Wizard, Sorcerer, or Warlock) and fill the [CHARACTER] template. Include appropriate spells in the [SPELLS] block, and items + attributes that fit a spellcaster.",
+                    melee: "Generate a random D&D Melee Fighter (Fighter, Barbarian, or Paladin) and fill the [CHARACTER] template. Include heavy armor, weapons, and high physical attributes.",
+                    rogue: "Generate a random D&D Rogue or Thief-style character and fill the [CHARACTER] template. Include stealth-related items, tools, and high Dexterity."
+                };
+
+                el.querySelectorAll('.rt-random-char-btn').forEach(b => b.disabled = true);
+                btn.textContent = labels[archetype] || '🎲 Rolling...';
+                await sendDirectPrompt(prompts[archetype]);
+            });
+        });
+
         el.querySelectorAll('.rt-section-header').forEach(header => {
             // Unbind to prevent duplicate listeners
             const oldHeader = header;

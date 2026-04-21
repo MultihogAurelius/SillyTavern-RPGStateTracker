@@ -1,6 +1,6 @@
 {
   "display_name": "RPG State Tracker",
-  "version": "1.0.0 BETA",
+  "version": "1.0.5",
   "author": "Disgusting Fatbody",
   "js": "index.js",
   "css": "style.css",

@@ -1072,3 +1072,33 @@
     opacity: 0.3;
     pointer-events: none;
 }
+.rt-onboarding-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.rt-random-char-btn {
+    background: var(--rt-accent-bg);
+    border: 1px solid var(--rt-accent-dim);
+    color: var(--rt-accent);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 8px;
+    font-family: var(--rt-font);
+    transition: all 0.2s ease;
+}
+
+.rt-random-char-btn:hover {
+    background: var(--rt-accent-bg);
+    border-color: var(--rt-accent);
+}
+
+.rt-random-char-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
