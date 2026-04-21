@@ -25,7 +25,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 - **Rendered HUD:** A draggable, dynamic floating panel presenting the state as organized, paginated cards (with visual HP bars and spell slot pips). Toggle between "Rendered View" and "Raw View" at any time.
 - **Snapshot History:** Maintains a rolling history of the last 5 state changes. Navigate back in time to view or restore past states.
 - **Delta Change Log:** A resizeable logging panel showing a line-by-line diff (`+`/`-`) of what changed in the most recent turn.
-- **Direct Prompt (💬):** Input custom instructions to directly manipulate state without feeding commands into the narrative context.
+- **Direct Prompt (💬):** Input custom instructions to directly manipulate state without feeding commands into the narrative context. Add/remove spells or abilities, create characters, add party members, fix formatting, level up. The AI will edit everything for you.
 - **Archetype Onboarding:** Don't have a character sheet? Use the quick-start buttons to generate a random **Magic User**, **Melee Fighter**, or **Rogue** instantly.
 - **SYSPROMPT Button:** Quickly copy the Narrator's system prompt (including combat and save rules) directly from the tracker footer.
 - **Mobile Support:** Continue where you left off on your phone. Host your session with the Remote-Link .bat file in the ST directory, and play on the bus.
