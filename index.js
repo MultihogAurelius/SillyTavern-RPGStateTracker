@@ -1081,7 +1081,7 @@
             return `<div class="rt-empty">
                 <div class="rt-empty-icon">📜</div>
                 <div>Create a character to get started.</div>
-                <small>Stats, inventory, and abilities will be recorded automatically from chat. You can also click the 💬 icon to prompt for character creation or paste them in Raw view.</small>
+                <small>Stats, inventory, and abilities are recorded automatically from chat. You can manually prompt for creation via the 💬 icon, or <b>create a random character based on an archetype:</b></small>
                 <div class="rt-onboarding-buttons">
                     <button class="rt-random-char-btn" data-archetype="magic">✨ Magic User</button>
                     <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee Fighter</button>
