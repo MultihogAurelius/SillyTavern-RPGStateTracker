@@ -28,6 +28,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 - **Direct Prompt (💬):** Input custom instructions to directly manipulate state without feeding commands into the narrative context.
 - **Archetype Onboarding:** Don't have a character sheet? Use the quick-start buttons to generate a random **Magic User**, **Melee Fighter**, or **Rogue** instantly.
 - **SYSPROMPT Button:** Quickly copy the Narrator's system prompt (including combat and save rules) directly from the tracker footer.
+- **Mobile Support:** Continue where you left off on your phone. Host your session with the Remote-Link .bat file in the ST directory, and play on the bus.
 
 <img width="2154" height="1374" alt="Screenshot 2026-04-21 203412" src="https://github.com/user-attachments/assets/ba716910-401f-4e98-9836-5ae68510b43f" />
 
