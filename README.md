@@ -53,7 +53,7 @@ This framework is highly optimized for complex play. For the complete experience
 3. **Prompt Injection:** The State Memo and RNG Queue are injected seamlessly into your outgoing prompt. It acts as the "source of truth," assuring the model accurately remembers HP, inventory, and mechanical outcomes.
 4. **Validation:** Use the Delta Log (δ) to verify changes. If the AI hallucinations, step backwards using the Snapshot Navigation (←/→) to restore a clean state.
 
-NOTE: the AI does not need any particular kind of formatting to understand the State Memo, but for the UI to show up properly, a template has to be followed. The AI has awareness of all of these templates and outputs them automatically when recording memos.
+NOTE: the AI does not need any particular kind of formatting to understand the State Memo, but for the UI to show up properly, a template has to be followed. The AI has awareness of all of these templates and outputs them automatically when recording memos. You can also look at the templates in the Module settings.
 
 ## License
 MIT
