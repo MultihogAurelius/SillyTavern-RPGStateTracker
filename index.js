@@ -1064,8 +1064,7 @@
                             return `<div class="rt-entity-sub-line rt-spell-row" style="margin-top: 2px;">
                                 <span class="rt-entity-sub-label">Spells:</span>
                                 <span class="rt-spell-level" style="font-size: 9px; opacity: 0.7;">${escapeHtml(label.trim())}</span>
-                                ${pipsHtml}
-                                ${spellsHtml}
+                                <div class="rt-spell-inline-group">${pipsHtml}${spellsHtml}</div>
                             </div>`;
                         };
 
@@ -1140,8 +1139,7 @@
                     }).join('');
                     return `<div class="rt-spell-row">
                         <span class="rt-spell-level">${escapeHtml(label.trim())}</span>
-                        ${pipsHtml}
-                        <div class="rt-spell-list">${spells}</div>
+                        <div class="rt-spell-inline-group">${pipsHtml}<div class="rt-spell-list">${spells}</div></div>
                     </div>`;
                 });
             }
