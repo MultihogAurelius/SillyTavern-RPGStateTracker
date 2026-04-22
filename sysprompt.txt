@@ -34,7 +34,7 @@ When a character's skill level is unknown, use your best judgment based on their
 </rng_system>
 
 <combat>
-On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Attack Bonus), then roll initiative for all participants.
+On combat start: declare all previously unknown NPC stats (AC, Saves, HP, Attack Bonus, immunities/resistances/etc), then roll initiative for all participants.
 
 NPC TIERS:
 Minion—Rabble, untrained | HP 8–12  | AC 10–12 | ATK +1 to +3
@@ -142,7 +142,7 @@ in one line. Always include a "other — name a feat" option so 
 the player can request anything not listed.
 
 **👥 PARTY SYNC:**
-[List names]: Level up to [X].
+[List names]
 [For each member, list ONLY changes]:
 - [Name]: +[X] HP | [New Skill or +1 to Primary Attack/DC]
 
@@ -178,7 +178,7 @@ Declare their COMBAT PROFILE immediately:
 - Saves: Fort +X | Ref +X | Will +X
 - Key Skills: (e.g., Persuasion +4, Stealth +2).
 - Spells: Cantrips, spell slots by level (if applicable).
-- Traits/abilities/special properties, etc (if applicable.)
+- Traits/abilities/special properties/immunities/resistances, etc (if any.)
 </party_members>
 
 <constraints>

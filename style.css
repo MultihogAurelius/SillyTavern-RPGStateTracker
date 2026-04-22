@@ -705,6 +705,11 @@
     font-weight: 500;
 }
 
+.rt-entity-other {
+    color: #aa88ff;
+    font-style: italic;
+}
+
 /* Inventory */
 .rt-card-item {
     color: var(--rt-text);
