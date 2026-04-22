@@ -19,7 +19,7 @@
 
     const DEFAULT_STOCK_PROMPTS = {
         character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
-        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Cantrips: Spell1, Spell1 | Level N (avail/max)\nStatus: Effect (duration Xh Xm)\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSaves: Fort +3 | Ref +5 | Will +2\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Cantrips: Mage Hand | Level 1 (2/2)\nStatus: Healthy\n[/PARTY]",
+        party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Cantrips: Spell1, Spell2\nSpells: Level N (avail/max): Spell1, Spell2\nStatus: Effect (duration Xh Xm)\n\nFor spells: output ONE `Spells:` line per spell level. Do NOT merge multiple levels onto one line with pipes.\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSaves: Fort +3 | Ref +5 | Will +2\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Cantrips: Mage Hand\nSpells: Level 1 (2/2): Hunter's Mark, Goodberry\nStatus: Healthy\n[/PARTY]",
         combat: "Active enemies/NPCs in combat. Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:\nName: current/max HP\nAtt/def: Weapon (+X / damage) | Armor (AC: Z)\nSaves: Fort +X, Ref +X, Will +X\nOther: Resistances, immunities, or special properties\nStatus: Effect (duration)\n\nYou MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.\n\nExample:\n[INVENTORY]\n- Data-crystal\n- 1,000 GP\n[/INVENTORY]",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
@@ -1036,15 +1036,17 @@
                     } else if (line.toLowerCase().startsWith('spells:') && lastEntityIdx !== -1) {
                         const startIdx = line.indexOf(':') + 1;
                         const spellLine = line.substring(startIdx).trim();
-                        // Support shared spell rendering logic for companions
-                        const m = spellLine.match(/^(Level\s*\d+|Cantrips?)\s*(?:\((\d+)\/(\d+)[^)]*\))?\s*(?::\s*(.+))?$/i);
-                        if (m) {
+
+                        // Helper to render a single parsed spell-level group
+                        const renderSpellGroup = (groupStr) => {
+                            const m = groupStr.trim().match(/^(Level\s*\d+|Cantrips?)\s*(?:\((\d+)\/(\d+)[^)]*\))?\s*(?::\s*(.+))?$/i);
+                            if (!m) return null;
                             const [, label, availStr, maxStr, spellList] = m;
                             const isCantrip = /cantrip/i.test(label);
                             let pipsHtml = '';
                             if (!isCantrip && availStr !== undefined && maxStr !== undefined) {
-                                const avail = parseInt(availStr, 10), max = parseInt(maxStr, 10);
-                                const pips = Array.from({ length: max }, (_, i) =>
+                                const avail = parseInt(availStr, 10), maxSlots = parseInt(maxStr, 10);
+                                const pips = Array.from({ length: maxSlots }, (_, i) =>
                                     `<span class="rt-slot-pip${i < avail ? ' rt-slot-available' : ' rt-slot-used'}"></span>`
                                 ).join('');
                                 pipsHtml = `<span class="rt-slot-pips">${pips}</span>`;
@@ -1059,16 +1061,35 @@
                                 }).join('');
                                 spellsHtml = `<div class="rt-spell-list" style="margin-left: 4px;">${spells}</div>`;
                             }
-                            
-                            const rowHtml = `<div class="rt-entity-sub-line rt-spell-row" style="margin-top: 2px;">
+                            return `<div class="rt-entity-sub-line rt-spell-row" style="margin-top: 2px;">
                                 <span class="rt-entity-sub-label">Spells:</span>
                                 <span class="rt-spell-level" style="font-size: 9px; opacity: 0.7;">${escapeHtml(label.trim())}</span>
                                 ${pipsHtml}
                                 ${spellsHtml}
                             </div>`;
-                            results[lastEntityIdx] += rowHtml;
-                        } else {
-                            // Fallback if model format is loose
+                        };
+
+                        // Support BOTH formats:
+                        // New (standard): one Spells: line per level
+                        //   e.g. "Spells: Cantrips: Guidance"
+                        //        "Spells: Level 1 (2/2): Hunter's Mark, Goodberry"
+                        // Legacy (compound): pipe-separated levels on one Spells: line
+                        //   e.g. "Spells: Cantrips: Guidance | Level 1 (2/2): Hunter's Mark, Goodberry"
+                        const isCompound = /\|/.test(spellLine) && /(?:Level\s*\d+|Cantrips?)/i.test(spellLine);
+                        const groups = isCompound
+                            ? spellLine.split(/\s*\|\s*/)
+                            : [spellLine];
+
+                        let renderedAny = false;
+                        for (const group of groups) {
+                            const rowHtml = renderSpellGroup(group);
+                            if (rowHtml) {
+                                results[lastEntityIdx] += rowHtml;
+                                renderedAny = true;
+                            }
+                        }
+                        if (!renderedAny) {
+                            // Fallback if model format is unrecognizable
                             results[lastEntityIdx] += `<div class="rt-entity-sub-line"><span class="rt-entity-sub-label">Spells:</span> ${highlightParens(escapeHtml(spellLine))}</div>`;
                         }
                     } else {
