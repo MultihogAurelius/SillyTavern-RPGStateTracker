@@ -2,6 +2,17 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.2.4] - 2026-04-23
+
+### Added
+- **Combat-First Layout**: The `[COMBAT]` section now defaults to the top of the UI for quicker access during encounters.
+- **Enhanced Entity Detail**: The `Other:` and `Resistances:` fields in Combat, Character, and Party blocks now utilize the interactive **Unit Pill** system.
+  - Descriptions in parentheses now appear as glassmorphism tooltips.
+  - Consistent styling across all entity-based data fields.
+
+### Changed
+- **Refactored Renderer**: Centralized the pill rendering logic to ensure uniform behavior across all framework sections.
+
 ## [1.2.3] - 2026-04-23
 
 ### Added
