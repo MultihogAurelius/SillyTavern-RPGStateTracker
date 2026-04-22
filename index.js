@@ -20,7 +20,7 @@
     const DEFAULT_STOCK_PROMPTS = {
         character: "Main character's core stats. Use this format:\n[CHARACTER]\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nStatus: Effect (duration Xh Xm)\n[/CHARACTER]\n\nUpon LEVEL UP, incorporate attribute changes.",
         party: "Companion/Party members. Use this format for each member:\nName (Class): current/max HP\nAtt/def: Weapon (stats) | Armor (AC: Z)\nAttr: STR X, DEX X, CON X, INT X, WIS X, CHA X\nSaves: Fort +X | Ref +X | Will +X\nSkills: Skill1 +X, Skill2 +X\nTraits: Trait1 (effect), Trait2 (effect)\nSpells: Cantrips: Spell1, Spell2\nSpells: Level N (avail/max): Spell1, Spell2\nStatus: Effect (duration Xh Xm)\n\nFor spells: output ONE `Spells:` line per spell level. Do NOT merge multiple levels onto one line with pipes.\n\nOnly add party members if you see (X joins the party.)\nOnly remove party members if you see (X leaves the party.)\n\nPERSISTENCE: If the party changes, you MUST output the ENTIRE [PARTY] block including all existing characters. Never omit a character unless they leave the party.\n\nExample party: [PARTY]Elara (Ranger): 26/45 HP\nAtt/def: Shortbow (+5 / 1d6+3 P) | Leather Armor (AC: 15)\nAttr: STR 12, DEX 16, CON 14, INT 10, WIS 14, CHA 12\nSaves: Fort +3 | Ref +5 | Will +2\nSkills: Athletics +3, Perception +5\nTraits: Natural Explorer (ignore difficult terrain)\nSpells: Cantrips: Mage Hand\nSpells: Level 1 (2/2): Hunter's Mark, Goodberry\nStatus: Healthy\n[/PARTY]",
-        combat: "Active enemies/NPCs in combat. Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:\nName: current/max HP\nAtt/def: Weapon (+X / damage) | Armor (AC: Z)\nSaves: Fort +X, Ref +X, Will +X\nOther: Resistances, immunities, or special properties\nStatus: Effect (duration)\n\nYou MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
+        combat: "Active enemies/NPCs in combat. Track the current [COMBAT ROUND] starting from 1. Decrement buff/debuff durations by 1 each round. Format each combatant as:\nName: current/max HP\nAtt/def: Weapon (+X / damage) | Armor (AC: Z)\nSaves: Fort +X, Ref +X, Will +X\nOther: Trait1 (description), Trait2 (description)\nStatus: Effect (duration)\n\nYou MUST output `[COMBAT]END_COMBAT[/COMBAT]` when the narrative ends combat. Do not put members of [PARTY] into [COMBAT].",
         inventory: "Items, loot, equipment, and wealth. You MAY create this section if loot is found and it doesn't currently exist.\n\nExample:\n[INVENTORY]\n- Data-crystal\n- 1,000 GP\n[/INVENTORY]",
         abilities: "Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells.",
         spells: "Spell slots and spells known, grouped by level. Format each line as: `Level N (avail/max): Spell1, Spell2`. For cantrips, use `Cantrips: Spell1, Spell2`. Track slot usage accurately. NEVER mix these with abilities.",
@@ -823,6 +823,33 @@
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    const splitSmart = (text) => {
+        const res = [];
+        let cur = '', depth = 0;
+        for (const c of text) {
+            if (c === '(') depth++; else if (c === ')') depth--;
+            if (c === ',' && depth === 0) { res.push(cur.trim()); cur = ''; }
+            else cur += c;
+        }
+        if (cur.trim()) res.push(cur.trim());
+        return res;
+    };
+
+    const renderPills = (text) => {
+        return splitSmart(text).map(t => {
+            const m = t.match(/^(.+?)\s*\((.+)\)$/);
+            if (m) {
+                const [, name, desc] = m;
+                return `<span class="rt-unit-pill">
+                    <span class="rt-unit-name">${escapeHtml(name)}</span>
+                    <span class="rt-unit-icon">i</span>
+                    <span class="rt-unit-descr">${escapeHtml(desc)}</span>
+                </span>`;
+            }
+            return `<span class="rt-unit-pill no-desc"><span class="rt-unit-name">${escapeHtml(t)}</span></span>`;
+        }).join('');
+    };
+
     // ── History index: -1 means "live", 0 = most recent snapshot, higher = older
     let _historyViewIndex = -1;
 
@@ -943,8 +970,9 @@
                                 } else if (part.toLowerCase().startsWith('other:') || part.toLowerCase().startsWith('res:')) {
                                     const label = part.toLowerCase().startsWith('res:') ? 'Res:' : 'Other:';
                                     const start = part.toLowerCase().startsWith('res:') ? 4 : 6;
-                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line">
-                                        <span class="rt-entity-sub-label">${label}</span> ${highlightParens(escapeHtml(part.substring(start).trim()))}
+                                    const text = part.substring(start).trim();
+                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line rt-units-container">
+                                        <span class="rt-entity-sub-label">${label}</span> ${renderPills(text)}
                                     </div>`;
                                 } else {
                                     genericInfo.push(part);
@@ -996,41 +1024,15 @@
                         results[lastEntityIdx] += weaponHtml;
                     } else if (line.toLowerCase().startsWith('traits:') && lastEntityIdx !== -1) {
                         const traitsText = line.substring(7).trim();
-                        // Smart split on commas that aren't inside parentheses
-                        const splitTraits = (text) => {
-                            const res = [];
-                            let cur = '', depth = 0;
-                            for (const c of text) {
-                                if (c === '(') depth++; else if (c === ')') depth--;
-                                if (c === ',' && depth === 0) { res.push(cur.trim()); cur = ''; }
-                                else cur += c;
-                            }
-                            if (cur.trim()) res.push(cur.trim());
-                            return res;
-                        };
-
-                        const unitUnits = splitTraits(traitsText).map(t => {
-                            const m = t.match(/^(.+?)\s*\((.+)\)$/);
-                            if (m) {
-                                const [, name, desc] = m;
-                                return `<span class="rt-unit-pill">
-                                    <span class="rt-unit-name">${escapeHtml(name)}</span>
-                                    <span class="rt-unit-icon">i</span>
-                                    <span class="rt-unit-descr">${escapeHtml(desc)}</span>
-                                </span>`;
-                            }
-                            return `<span class="rt-unit-pill no-desc"><span class="rt-unit-name">${escapeHtml(t)}</span></span>`;
-                        }).join('');
-
                         const traitsHtml = `<div class="rt-entity-sub-line rt-units-container">
-                            <span class="rt-entity-sub-label">Traits:</span> ${unitUnits}
+                            <span class="rt-entity-sub-label">Traits:</span> ${renderPills(traitsText)}
                         </div>`;
                         results[lastEntityIdx] += traitsHtml;
                     } else if ((line.toLowerCase().startsWith('other:') || line.toLowerCase().startsWith('resistances:')) && lastEntityIdx !== -1) {
                         const startIdx = line.indexOf(':') + 1;
                         const otherText = line.substring(startIdx).trim();
-                        const otherHtml = `<div class="rt-entity-sub-line">
-                            <span class="rt-entity-sub-label">Other:</span> <span class="rt-entity-other">${highlightParens(escapeHtml(otherText))}</span>
+                        const otherHtml = `<div class="rt-entity-sub-line rt-units-container">
+                            <span class="rt-entity-sub-label">Other:</span> ${renderPills(otherText)}
                         </div>`;
                         results[lastEntityIdx] += otherHtml;
                     } else if (line.toLowerCase().startsWith('spells:') && lastEntityIdx !== -1) {
@@ -1160,30 +1162,10 @@
                 const allAbilities = lines.flatMap(line => {
                     const l = line.trim();
                     if (l.match(/^[-*]\s+/)) return [l.replace(/^[-*]\s*/, '')];
-                    // Smart split on commas
-                    const res = [];
-                    let cur = '', depth = 0;
-                    for (const c of l) {
-                        if (c === '(') depth++; else if (c === ')') depth--;
-                        if (c === ',' && depth === 0) { res.push(cur.trim()); cur = ''; }
-                        else cur += c;
-                    }
-                    if (cur.trim()) res.push(cur.trim());
-                    return res;
+                    return splitSmart(l);
                 });
                 
-                return allAbilities.map(t => {
-                    const m = t.match(/^(.+?)\s*\((.+)\)$/);
-                    if (m) {
-                        const [, name, desc] = m;
-                        return `<span class="rt-unit-pill">
-                            <span class="rt-unit-name">${escapeHtml(name)}</span>
-                            <span class="rt-unit-icon">i</span>
-                            <span class="rt-unit-descr">${escapeHtml(desc)}</span>
-                        </span>`;
-                    }
-                    return `<span class="rt-unit-pill no-desc"><span class="rt-unit-name">${escapeHtml(t)}</span></span>`;
-                });
+                return allAbilities.map(t => renderPills(t));
             }
             default:
                 return lines.map(line => {
@@ -1207,6 +1189,7 @@
                 </div>
             </div>`;
         }
+        
         const blocks = parseMemoBlocks(memo);
         if (Object.keys(blocks).length === 0) {
             return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
