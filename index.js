@@ -2321,7 +2321,7 @@
         try {
             // Load Settings UI using the dynamic folder name
             // Use a cache-busting parameter to ensure we get the fresh file from the server
-            const html = await renderExtensionTemplateAsync(`third-party/${FOLDER_NAME}`, 'settings_v110', { v: Date.now() });
+            const html = await renderExtensionTemplateAsync(`third-party/${FOLDER_NAME}`, 'settings', { v: Date.now() });
             // Third-party plugins should go to extensions_settings2 (right column) if available
             if ($('#extensions_settings2').length) {
                 $('#extensions_settings2').append(html);
