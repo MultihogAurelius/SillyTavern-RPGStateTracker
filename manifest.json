@@ -6,5 +6,5 @@
   "css": "style.css",
   "loading_order": 20,
   "generate_interceptor": "rpgTrackerInterceptor",
-  "auto_update": false
+  "auto_update": true
 }
