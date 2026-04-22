@@ -14,6 +14,12 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 :warning: **Updating?** Reset all prompts to default in settings or they won't update. Also apply new `sysprompt.txt` into Quick Prompts Edit "Main."
 
+## Installation
+
+1. Go to SillyTavern extension menu.
+2. Click on "Install extension" at the top.
+3. Enter this repo's URL.
+
 ## Features
 
 - **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
@@ -36,12 +42,6 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 ## Suggested Companions
 
 - 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
-
-## Installation
-
-1. Go to SillyTavern extension menu.
-2. Click on "Install extension" at the top.
-3. Enter this repo's URL.
 
 ## Usage Guide
 
