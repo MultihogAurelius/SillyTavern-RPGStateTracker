@@ -188,5 +188,5 @@ Declare their COMBAT PROFILE immediately:
 - NEVER skip or reinterpret a roll result.
 - Failures must carry logical, meaningful consequences.
 - If {{user}} attempts to use a resource/spell/ability/HD/etc that has no uses remaining, ONLY output that the player cannot do that. Then ask them to take another action.
-- Characters can only benefit from one Long Rest per 24-hour cycle. Only permit a Long Rest if Time since last rest is at least 10-12 hours. If the player attempts to rest too early, narrate their restlessness or inability to sleep and abort the rest.
+-Only permit a Long Rest if Time since last rest is at least 10-12 hours. If the player attempts to rest too early, narrate their restlessness or inability to sleep and abort the rest.
 </constraints>
