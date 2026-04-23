@@ -22,18 +22,19 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 ## Features
 
-- **Modular & Custom Fields:** Logic is segmented into specific modules using `[TAG]...[/TAG]` blocks.
-  - The extension provides customizable stock fields such as: `[CHARACTER]`, `[PARTY]`, `[COMBAT]`, `[INVENTORY]`, `[ABILITIES]`, and `[SPELLS]`.
-  - **Custom Fields:** Define entirely new, arbitrary tags (e.g., `[QUESTS]`, `[RELATIONSHIPS]`). Assign them custom emoji icons, specific rendering styles (HP bars, pips, line-items, or pills), and unique extraction prompt logic.
-  - **Editable Logic:** The prompt instruction for every field can be edited in settings to fit your campaign's rules.
-- **Rendered HUD:** A draggable, dynamic floating panel presenting the state as organized, paginated cards (with visual HP bars and spell slot pips). Toggle between "Rendered View" and "Raw View" at any time.
-- **Snapshot History:** Maintains a rolling history of the last 5 state changes. Navigate back in time to view or restore past states.
-- **Delta Change Log:** A resizeable logging panel showing a line-by-line diff (`+`/`-`) of what changed in the most recent turn.
-- **Direct Prompt (💬):** Input custom instructions to directly manipulate state without feeding commands into the narrative context. Add/remove spells or abilities, create characters, add party members, fix formatting, level up. The AI will edit everything for you.
-- **Archetype Onboarding:** Don't have a character sheet? Use the quick-start buttons to generate a random **Magic User**, **Melee Fighter**, or **Rogue** instantly.
-- **SYSPROMPT Button:** Quickly copy the Narrator's system prompt (including combat and save rules) directly from the tracker footer.
-- **Mobile Support:** Continue where you left off on your phone. Host your session with the Remote-Link .bat file in the ST directory, and play on the bus.
-- **Real-Time Buff Tracking:** Buff/debuff temporal decay via [TIME] delta tracking.
+- **Draggable HUD** with HP bars, spell pips, etc.
+- **Automatic spell slot tracking** via 🔵 pips in the UI; never worry about remembering how many you have left
+- **Buff/debuff temporal decay** via [TIME] delta tracking; statuses expire automatically over time based on time elapsed
+- **Snapshot history + delta log** - easy rollback, and see at a glance what was changed in the state
+- **Auto model-switching** so that you can use a different model for tracking the state
+- **Full-context audit mode** in case you lose your state
+- **Custom fields, themes, reorderable sections**; track whatever you want, beyond the stock fields
+- **Automatic D&D wikidot spell links** - look up spells by clicking on them without awkward googling
+- **Mobile support** (open from the wand menu)
+- **Talk to the tracker model directly via (💬)**, making editing or adding things easy
+- **Onboarding system** - roll up a random character or describe one to the model
+- **Profile saving** - switch between multiple campaigns without losing your state
+- **Homebrew-friendly** and flexible in general, relying on AI to do a lot of the lifting
 
 <img width="2138" height="1367" alt="image" src="https://github.com/user-attachments/assets/6eb8b2b6-d4f6-4fc8-9d34-988ad03331ba" />
 
