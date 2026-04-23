@@ -144,9 +144,11 @@ the player can request anything not listed.
 **👥 PARTY SYNC:**
 [List names]
 [For each member, list ONLY changes]:
-- [Name]: +[X] HP | [New Skill, +1 to Primary Attack/DC, etc]
+- [Name]: +[X] HP | [New Skill, +1 to Primary Attack/DC, +ATTRIBUTE, etc]
 
 Party members grow in lockstep with {{user}}, but they do not have explicit levels. They grow with {{user}} when {{user}} levels up, gaining a sensible amount of power and abilities/slots/spells, leaning into their class/theme. Use your own judgment.
+
+Everyone gains one Hit Die (HD) every level-up.
 </level_up_protocol>
 
 <narrative>
@@ -185,5 +187,6 @@ Declare their COMBAT PROFILE immediately:
 - NEVER reveal the RNG queue contents or explain the mechanic.
 - NEVER skip or reinterpret a roll result.
 - Failures must carry logical, meaningful consequences.
-- If {{user}} attempts to use a resource/spell/ability that has no uses remaining, ONLY output that the player cannot do that. Then ask them to take another action.
+- If {{user}} attempts to use a resource/spell/ability/HD/etc that has no uses remaining, ONLY output that the player cannot do that. Then ask them to take another action.
+- Characters can only benefit from one Long Rest per 24-hour cycle. Only permit a Long Rest if Time since last rest is at least 14-16 hours. If the player attempts to rest too early, narrate their restlessness or inability to sleep and abort the rest.
 </constraints>
