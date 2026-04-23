@@ -2,11 +2,6 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
-## [1.3.1] - 2026-04-24
-
-### Changed
-- **UI Clarification**: Added a hint to the "Oval Pills" render style in the Custom Field editor to explain tooltip support via parentheses.
-
 ## [1.3.0] - 2026-04-24
 
 ### Added
