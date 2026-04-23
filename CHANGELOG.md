@@ -2,6 +2,15 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.2.8] - 2026-04-24
+
+### Fixed
+- **Onboarding UX**: Fixed markdown bolding in the onboarding guide and scaled up all font sizes for better readability.
+- **Profile Persistence**: The profile dropdown now correctly remembers the "-- No Profile --" selection across page refreshes.
+
+### Added
+- **Guided Creation**: Updated the startup guide to suggest using the manual update icon (💬) for character creation via description.
+
 ## [1.2.7] - 2026-04-24
 
 ### Added

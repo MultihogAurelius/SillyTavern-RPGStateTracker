@@ -948,7 +948,7 @@
                             </div>
                             <span class="rt-hp-label">${label}</span>
                         </div>`);
-                        
+
                         if (status) {
                             // Split inline status by pipe to find AC, Saves, etc.
                             const parts = status.split('|').map(p => p.trim()).filter(Boolean);
@@ -1027,12 +1027,12 @@
                         let hdText = line.substring(startIdx).trim();
                         let pipsHtml = escapeHtml(hdText);
                         const m = hdText.match(/^([^(]+?)\s*(?:\((\d+)\/(\d+)\))?$/);
-                        if(m) {
+                        if (m) {
                             const [, dice, curStr, maxStr] = m;
                             if (curStr && maxStr) {
                                 const cur = parseInt(curStr, 10);
                                 const max = parseInt(maxStr, 10);
-                                const pips = Array.from({length: max}, (_, i) => 
+                                const pips = Array.from({ length: max }, (_, i) =>
                                     `<span class="rt-hd-pip${i < cur ? ' rt-hd-available' : ''}"></span>`
                                 ).join('');
                                 pipsHtml = `<span class="rt-hd-label">[ ${escapeHtml(dice.trim())} ]</span> <span class="rt-hd-pips">${pips}</span>`;
@@ -1128,36 +1128,36 @@
                 const parseTimeStr = (str) => {
                     let d = 0, h = 0, m = 0;
                     const dayMatch = str.match(/(?:Day|D)\s*(\d+)/i);
-                    if(dayMatch) d = parseInt(dayMatch[1], 10);
+                    if (dayMatch) d = parseInt(dayMatch[1], 10);
                     const timeMatch = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-                    if(timeMatch) {
+                    if (timeMatch) {
                         let tmph = parseInt(timeMatch[1], 10);
                         m = parseInt(timeMatch[2], 10);
-                        if(timeMatch[3]) {
+                        if (timeMatch[3]) {
                             const ampm = timeMatch[3].toUpperCase();
-                            if(ampm === 'PM' && tmph < 12) tmph += 12;
-                            if(ampm === 'AM' && tmph === 12) tmph = 0;
+                            if (ampm === 'PM' && tmph < 12) tmph += 12;
+                            if (ampm === 'AM' && tmph === 12) tmph = 0;
                         }
                         h = tmph;
                     }
-                    if(!dayMatch && !timeMatch) return null;
+                    if (!dayMatch && !timeMatch) return null;
                     return (d * 24 * 60) + (h * 60) + m;
                 };
 
-                for(let line of lines) {
+                for (let line of lines) {
                     if (line.toLowerCase().startsWith('last rest:')) continue;
                     if (!parsedCurrent) {
-                       const t = parseTimeStr(line);
-                       if (t !== null) {
-                           currentTotalMins = t;
-                           parsedCurrent = true;
-                       }
+                        const t = parseTimeStr(line);
+                        if (t !== null) {
+                            currentTotalMins = t;
+                            parsedCurrent = true;
+                        }
                     }
                 }
 
                 return lines.map(line => {
                     if (line.toLowerCase().startsWith('last rest:')) {
-                        const restVal = line.substring(line.indexOf(':')+1).trim();
+                        const restVal = line.substring(line.indexOf(':') + 1).trim();
                         let append = "";
                         if (parsedCurrent) {
                             const restMins = parseTimeStr(restVal);
@@ -1167,8 +1167,8 @@
                                     const dH = Math.floor(diff / 60);
                                     const dM = diff % 60;
                                     append = ` <i style="opacity: 0.7; font-size: 0.9em;">(${dH > 0 ? dH + ' hours ' : ''}${dM > 0 ? dM + ' minutes ' : ''}ago)</i>`;
-                                    if(diff === 0) append = ` <i style="opacity: 0.7; font-size: 0.9em;">(just now)</i>`;
-                                    if(dH >= 24) {
+                                    if (diff === 0) append = ` <i style="opacity: 0.7; font-size: 0.9em;">(just now)</i>`;
+                                    if (dH >= 24) {
                                         const dDays = Math.floor(dH / 24);
                                         const dRemH = dH % 24;
                                         append = ` <i style="opacity: 0.7; font-size: 0.9em;">(${dDays} days ${dRemH > 0 ? dRemH + ' hours ' : ''}ago)</i>`;
@@ -1242,7 +1242,7 @@
                     if (l.match(/^[-*]\s+/)) return [l.replace(/^[-*]\s*/, '')];
                     return splitSmart(l);
                 });
-                
+
                 return allAbilities.map(t => renderPills(t));
             }
             default:
@@ -1259,12 +1259,12 @@
             return `<div class="rt-empty" style="text-align: left; align-items: flex-start; padding: 12px; gap: 10px; overflow-y: auto;">
                 <div style="text-align: center; width: 100%; margin-bottom: 4px; flex-shrink: 0;">
                     <div class="rt-empty-icon">📜</div>
-                    <div style="font-size: 15px; font-weight: bold; color: var(--rt-text);">Fatbody D&D Framework</div>
+                    <div style="font-size: 17px; font-weight: bold; color: var(--rt-text);">Fatbody D&D Framework</div>
                 </div>
-                
-                <div style="font-size: 11px; opacity: 0.9; margin-top: 4px; flex-shrink: 0; line-height: 1.4;">
-                    <b style="color: var(--rt-accent); font-size: 12px;">Initial Setup:</b><br><br>
-                    1. Use the archetype buttons below to roll a new character, or paste an existing sheet into the "Raw View". If your sheet doesn't align with what the UI expects, ask the model via 💬 to fix the formatting after pasting.<br><br>
+
+                <div style="font-size: 13px; opacity: 0.9; margin-top: 4px; flex-shrink: 0; line-height: 1.4;">
+                    <b style="color: var(--rt-accent); font-size: 14px;">Initial Setup:</b><br><br>
+                    1. Use the archetype buttons below to roll a new character, paste an existing sheet into the "Raw View", or <b>manually describe a character</b> by clicking 💬 and asking the tracker to create one for you (e.g., "Create a level 5 Orc Paladin").<br><br>
                     2. Create a character card for your "narrator", such as Simulation Engine or Game Master.<br><br>
                     3. Finally, copy <code>sysprompt.txt</code> (or from the SYSPROMPT button) into your Quick Prompts "Main" box.<br><br>
                     <span style="color: #ffaa00;"><b>NOTE:</b> When you update Fatbody D&D Framework, make sure you copy SYSPROMPT from the bottom right again. The system prompt is often also updated.</span>
@@ -1274,17 +1274,17 @@
                     <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee</button>
                     <button class="rt-random-char-btn" data-archetype="rogue">🗡️ Rogue</button>
                 </div>
-                
-                <div style="font-size: 11px; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; line-height: 1.4;">
+
+                <div style="font-size: 13px; opacity: 0.9; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; line-height: 1.4;">
                     <div><b style="color: var(--rt-accent);">Auto-Tracking:</b> As you roleplay, the extension intelligently parses assistant responses. It detects losses of HP, new loot, or combat triggers, running background passes to update the state.</div>
-                    
+
                     <div><b style="color: var(--rt-accent);">Prompt Injection:</b> The State Memo and RNG Queue are injected seamlessly into your outgoing prompt. It acts as the "source of truth," assuring the model accurately remembers HP, inventory, and mechanical outcomes.</div>
-                    
+
                     <div><b style="color: var(--rt-accent);">Validation:</b> Use the Delta Log (δ) to verify changes. If the AI ever makes a mistake, step backwards using the Snapshot Navigation (←/→) to restore a clean state.</div>
                 </div>
             </div>`;
         }
-        
+
         const blocks = parseMemoBlocks(memo);
         if (Object.keys(blocks).length === 0) {
             return `<div class="rt-empty">No structured blocks found.<br><small>Switch to Raw view to inspect the memo.</small></div>`;
@@ -1922,7 +1922,7 @@
                 const response = await fetch(`scripts/extensions/third-party/${FOLDER_NAME}/sysprompt.txt`);
                 if (!response.ok) throw new Error('Failed to fetch sysprompt.txt');
                 const text = await response.text();
-                
+
                 await navigator.clipboard.writeText(text);
                 toastr['success']("System Prompt copied to clipboard!", "Fatbody Framework");
             } catch (err) {
@@ -2595,7 +2595,7 @@
                     toastr['success']("RPG Tracker logic wiped.", "RPG Tracker");
                 }
             });
-            
+
             $('#rpg_tracker_btn_factory_reset').on('click', function () {
                 if (confirm("⚠️ NUCLEAR OPTION ⚠️\n\nThis will wipe EVERYTHING: all custom fields, character history, saved profiles, and prompt changes. The framework will return to v1.1.0 factory defaults.\n\nProceed?")) {
                     const { extensionSettings } = SillyTavern.getContext();
