@@ -1269,6 +1269,12 @@
                     3. Finally, copy <code>sysprompt.txt</code> (or from the SYSPROMPT button) into your Quick Prompts "Main" box.<br><br>
                     <span style="color: #ffaa00;"><b>NOTE:</b> When you update Fatbody D&D Framework, make sure you copy SYSPROMPT from the bottom right again and also reset the prompts in the extension settings. The system prompt is often also updated.</span>
                 </div>
+                <div class="flex-container alignitemscenter justifycontentcenter gap-1" style="width: 100%; margin: 8px 0 4px 0; flex-shrink: 0;">
+                    <span style="font-size: 12px; opacity: 0.8; font-weight: bold;">Starting Level:</span>
+                    <select id="rt-starting-level" class="text_pole" style="width: auto; min-width: 60px; padding: 2px 4px; font-size: 12px; height: 24px; border-radius: 4px; background: var(--black70a);">
+                        ${[...Array(20).keys()].map(i => `<option value="${i + 1}">Level ${i + 1}</option>`).join('')}
+                    </select>
+                </div>
                 <div class="rt-onboarding-buttons" style="width: 100%; justify-content: center; margin: 4px 0; flex-shrink: 0;">
                     <button class="rt-random-char-btn" data-archetype="magic">✨ Magic</button>
                     <button class="rt-random-char-btn" data-archetype="melee">⚔️ Melee</button>
@@ -1374,11 +1380,12 @@
         el.querySelectorAll('.rt-random-char-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const archetype = btn.dataset.archetype;
+                const level = el.querySelector('#rt-starting-level')?.value || 1;
                 const labels = { magic: '✨ Casting...', melee: '⚔️ Training...', rogue: '🗡️ Sneaking...' };
                 const prompts = {
-                    magic: "Generate a random D&D Magic User (Wizard, Sorcerer, or Warlock). Output [CHARACTER], [SPELLS], [INVENTORY], and [ABILITIES] blocks. Include appropriate spells (using 'Cantrips:' for level 0 spells), items, and attributes.",
-                    melee: "Generate a random D&D Melee Fighter (Fighter, Barbarian, or Paladin). Output [CHARACTER], [INVENTORY], and [ABILITIES] blocks. Focus on high physical attributes, heavy armor, and signature weapons.",
-                    rogue: "Generate a random D&D Rogue or Thief-style character. Output [CHARACTER], [INVENTORY], and [ABILITIES] blocks. Focus on high Dexterity, stealth-related equipment (thieves' tools, daggers), and class features like Sneak Attack."
+                    magic: `Generate a random Level ${level} D&D Magic User (Wizard, Sorcerer, or Warlock). Output [CHARACTER], [SPELLS], [INVENTORY], and [ABILITIES] blocks. Include appropriate spells (using 'Cantrips:' for level 0 spells), items, and attributes consistent with Level ${level}.`,
+                    melee: `Generate a random Level ${level} D&D Melee Fighter (Fighter, Barbarian, or Paladin). Output [CHARACTER], [INVENTORY], and [ABILITIES] blocks. Focus on high physical attributes, heavy armor, and signature weapons consistent with Level ${level}.`,
+                    rogue: `Generate a random Level ${level} D&D Rogue or Thief-style character. Output [CHARACTER], [INVENTORY], and [ABILITIES] blocks. Focus on high Dexterity, stealth-related equipment (thieves' tools, daggers), and class features like Sneak Attack consistent with Level ${level}.`
                 };
 
                 el.querySelectorAll('.rt-random-char-btn').forEach(b => b.disabled = true);
