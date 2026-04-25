@@ -186,18 +186,28 @@
                 // Always force refresh the prompt when override is active to pick up manual file edits
                 const sysPrompt = await getSysPrompt(true);
                 if (sysPrompt) {
-                    let sysIdx = chat.findIndex(m => m.role === 'system' || m.is_system);
-                    if (sysIdx !== -1) {
-                        // Use spread for safer cloning of potentially proxied objects
-                        const clonedSys = { ...chat[sysIdx] };
+                    let firstSysIdx = -1;
+                    for (let i = 0; i < chat.length; i++) {
+                        if (chat[i].role === 'system' || chat[i].is_system) {
+                            if (firstSysIdx === -1) {
+                                firstSysIdx = i;
+                            } else {
+                                // Remove duplicate/extra system messages (like Jailbreaks/NSFW prompts) to ensure total override
+                                chat.splice(i, 1);
+                                i--;
+                            }
+                        }
+                    }
+
+                    if (firstSysIdx !== -1) {
+                        const clonedSys = { ...chat[firstSysIdx] };
                         if (typeof clonedSys.content === 'string') clonedSys.content = sysPrompt;
                         if (typeof clonedSys.mes === 'string') clonedSys.mes = sysPrompt;
-                        chat[sysIdx] = clonedSys;
+                        chat[firstSysIdx] = clonedSys;
                     } else {
-                        // Create a robust system message with both common content keys
                         chat.unshift({ role: 'system', content: sysPrompt, mes: sysPrompt, is_system: true });
                     }
-                    if (settings.debugMode) console.log("[Fatbody Framework] System prompt override applied.");
+                    if (settings.debugMode) console.log("[Fatbody Framework] System prompt override applied (duplicates cleared).");
                 }
             }
 
