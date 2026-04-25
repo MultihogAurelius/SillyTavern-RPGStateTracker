@@ -1317,7 +1317,7 @@
                     1. Use the archetype buttons below to roll a new character, paste an existing sheet into the "Raw View", or <b>manually describe a character</b> by clicking 💬 and asking the tracker to create one for you (e.g., "Create a level 5 Orc Paladin").<br><br>
                     2. Create a character card for your "narrator", such as Simulation Engine or Game Master.<br><br>
                     3. Finally, copy <code>sysprompt.txt</code> (or from the SYSPROMPT button) into your Quick Prompts "Main" box.<br><br>
-                    <span style="color: #ffaa00;"><b>NOTE:</b> When you update Fatbody D&D Framework, make sure you copy SYSPROMPT from the bottom right again. The system prompt is often also updated.</span>
+                    <span style="color: #ffaa00;"><b>NOTE:</b> When you update Fatbody D&D Framework, make sure you copy SYSPROMPT from the bottom right again and also reset the prompts in the extension settings. The system prompt is often also updated.</span>
                 </div>
                 <div class="rt-onboarding-buttons" style="width: 100%; justify-content: center; margin: 4px 0; flex-shrink: 0;">
                     <button class="rt-random-char-btn" data-archetype="magic">✨ Magic</button>
