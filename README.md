@@ -15,6 +15,7 @@ I wasn't satisfied with any of the commercial offerings available (AI Realm, AI 
 Together they solve the two core problems of LLM tabletop RP: the AI forgets your inventory, spells, etc., and you always winning (aka. plot armor.)
 
 :warning: **Updating?** Reset all prompts to default in settings or they won't update. Also apply new `sysprompt.txt` into Quick Prompts Edit "Main."
+:warning: **NOTE: if you close the UI window, it can be reopened from the wand menu.**
 
 ## Installation
 
