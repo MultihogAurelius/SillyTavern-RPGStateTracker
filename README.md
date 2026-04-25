@@ -60,6 +60,11 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 ## What Model to Use?
 I mostly use Gemini 3 Flash. A good all-rounder; very fast and cheap. GLM 5.1 is also a solid choice, but it can tend to reason far too long, bogging things down, especially combat. Experimentation with different models is recommended.
 
+<figure>
+<img width="2138" height="auto" alt="image" src="https://github.com/user-attachments/assets/a0e1c88c-092f-488b-b421-48cabe09e6e2" />
+<figcaption>Combat in progress</figcaption>
+</figure>
+
 ## License
 MIT
 
