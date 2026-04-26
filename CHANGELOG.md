@@ -2,6 +2,13 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.3.2] - 2026-04-26
+
+### Fixed
+- **UI Boundary Protection**: Implemented safety checks to prevent the UI from becoming inaccessible if moved or saved off-screen.
+  - Added coordinate sanitization to `loadPanelGeometry` and `createDetachedPanel` to ensure the panel always spawns within the visible viewport.
+  - Implemented movement constraints in the dragging logic to prevent moving the panel header beyond the browser window edges.
+
 ## [1.3.1] - 2026-04-26
 
 ### Fixed

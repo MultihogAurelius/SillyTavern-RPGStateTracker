@@ -719,8 +719,13 @@
         try {
             const saved = JSON.parse(localStorage.getItem(GEOMETRY_KEY));
             if (!saved) return;
-            if (saved.left !== undefined) { panel.style.left = saved.left + 'px'; panel.style.right = 'auto'; }
-            if (saved.top !== undefined) { panel.style.top = saved.top + 'px'; panel.style.bottom = 'auto'; }
+
+            // Sanitize coordinates to prevent "bricking" off-screen
+            const left = saved.left !== undefined ? Math.max(0, Math.min(window.innerWidth - 50, saved.left)) : undefined;
+            const top = saved.top !== undefined ? Math.max(0, Math.min(window.innerHeight - 50, saved.top)) : undefined;
+
+            if (left !== undefined) { panel.style.left = left + 'px'; panel.style.right = 'auto'; }
+            if (top !== undefined) { panel.style.top = top + 'px'; panel.style.bottom = 'auto'; }
             if (saved.width) panel.style.width = saved.width + 'px';
             if (saved.height) panel.style.height = saved.height + 'px';
         } catch { /* ignore */ }
@@ -1572,8 +1577,12 @@
         try {
             const saved = JSON.parse(localStorage.getItem(geoKey));
             if (saved && saved.left !== undefined) {
-                if (saved.left !== undefined) { panel.style.left = saved.left + 'px'; panel.style.right = 'auto'; }
-                if (saved.top !== undefined) { panel.style.top = saved.top + 'px'; panel.style.bottom = 'auto'; }
+                // Sanitize coordinates
+                const left = Math.max(0, Math.min(window.innerWidth - 50, saved.left));
+                const top = Math.max(0, Math.min(window.innerHeight - 50, saved.top));
+
+                panel.style.left = left + 'px'; panel.style.right = 'auto';
+                panel.style.top = top + 'px'; panel.style.bottom = 'auto';
                 if (saved.width) panel.style.width = saved.width + 'px';
                 if (saved.height) panel.style.height = saved.height + 'px';
             } else {
@@ -2018,8 +2027,15 @@
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            panel.style.left = (startLeft + (e.clientX - startX)) + 'px';
-            panel.style.top = (startTop + (e.clientY - startY)) + 'px';
+            const left = startLeft + (e.clientX - startX);
+            const top = startTop + (e.clientY - startY);
+
+            // Constrain to viewport (ensure header stays reachable)
+            const boundedLeft = Math.max(0, Math.min(window.innerWidth - 100, left));
+            const boundedTop = Math.max(0, Math.min(window.innerHeight - 50, top));
+
+            panel.style.left = boundedLeft + 'px';
+            panel.style.top = boundedTop + 'px';
         });
 
         document.addEventListener('mouseup', () => {
