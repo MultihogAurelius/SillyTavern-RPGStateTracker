@@ -60,6 +60,9 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 3. **Prompt Injection:** The State Memo and RNG Queue are injected seamlessly into your outgoing prompt. It acts as the "source of truth," assuring the model accurately remembers HP, inventory, and mechanical outcomes.
 4. **Validation:** Use the Delta Log (δ) to verify changes. If the AI ever makes a mistake, step backwards using the Snapshot Navigation (←/→) to restore a clean state. Not really needed in my experience much, but the option is there.
 
+## Basic Video Walkthrough
+https://www.youtube.com/watch?v=wg0JMMwqiUA
+
 ## Don't Care About D&D?
 
 You can scrap the entire system prompt and all the default fields and track your own things completely. The D&D setup is just a plug & play system that works by default. 
@@ -75,9 +78,6 @@ For the state pass, I use Gemini 3 Flash with medium reasoning.
     <figcaption>Some combat in progress</figcaption>
   </figure>
 </div>
-
-## Basic Video Walkthrough
-https://www.youtube.com/watch?v=wg0JMMwqiUA
 
 ## License
 MIT
