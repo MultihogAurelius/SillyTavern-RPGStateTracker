@@ -2161,7 +2161,25 @@
 
         const save = () => {
             field.icon = iconEl.value;
-            field.tag = tagEl.value.replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+            const newTag = tagEl.value.replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+            if (!newTag) {
+                toastr['error']('Tag cannot be empty.', 'RPG Tracker');
+                return;
+            }
+
+            const isStock = BLOCK_ORDER.includes(newTag);
+            if (isStock) {
+                toastr['error'](`Tag [${newTag}] is a reserved stock module name.`, 'RPG Tracker');
+                return;
+            }
+
+            const duplicate = s.customFields.find((f, i) => i !== index && f.tag.toUpperCase() === newTag);
+            if (duplicate) {
+                toastr['error'](`Tag [${newTag}] is already in use by another custom field.`, 'RPG Tracker');
+                return;
+            }
+
+            field.tag = newTag;
             field.label = labelEl.value;
             field.renderType = rtEl.value;
             field.prompt = promptEl.value;
@@ -2302,6 +2320,23 @@
         };
 
         if (!s.blockOrder) s.blockOrder = [...BLOCK_ORDER];
+
+        // --- Sanitization Pass: Ensure unique tags and no stock conflicts ---
+        const seenTags = new Set(BLOCK_ORDER);
+        (s.customFields || []).forEach(f => {
+            let baseTag = f.tag.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+            if (!baseTag) baseTag = 'CUSTOM';
+            let finalTag = baseTag;
+            let counter = 1;
+            while (seenTags.has(finalTag)) {
+                finalTag = `${baseTag}_${counter++}`;
+            }
+            if (f.tag !== finalTag) {
+                console.log(`[RPG Tracker] Sanitized tag: ${f.tag} -> ${finalTag}`);
+                f.tag = finalTag;
+            }
+            seenTags.add(finalTag);
+        });
 
         // Add any missing tags to blockOrder
         const allCustomTags = (s.customFields || []).map(f => f.tag.toUpperCase());
@@ -2538,8 +2573,18 @@
             $('#rpg_tracker_add_custom_field').on('click', function () {
                 const settings = getSettings();
                 if (!settings.customFields) settings.customFields = [];
+
+                let newTag = 'NEW_FIELD';
+                let counter = 1;
+                const isTagTaken = (tag) => BLOCK_ORDER.includes(tag) || settings.customFields.some(f => f.tag.toUpperCase() === tag);
+
+                while (isTagTaken(counter === 1 ? newTag : `${newTag}_${counter}`)) {
+                    counter++;
+                }
+                if (counter > 1) newTag = `${newTag}_${counter}`;
+
                 settings.customFields.push({
-                    tag: 'NEW_FIELD', label: 'New Field', icon: '📝',
+                    tag: newTag, label: 'New Field', icon: '📝',
                     prompt: 'What should the AI track for this new field? Describe it here.',
                     renderType: 'CHARACTER', enabled: true
                 });

@@ -2,6 +2,14 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.3.1] - 2026-04-26
+
+### Fixed
+- **Custom Field Limit**: Resolved a bug that limited the number of custom fields to two. 
+  - Implemented unique tag generation for new fields (e.g., `NEW_FIELD`, `NEW_FIELD_1`).
+  - Added real-time tag validation to prevent duplicate or reserved tags (like `XP` or `CHARACTER`).
+  - Added an auto-sanitization pass to `refreshOrderList` to automatically fix any existing duplicate tags in user settings.
+
 ## [1.3.0] - 2026-04-25
 
 ### Added
