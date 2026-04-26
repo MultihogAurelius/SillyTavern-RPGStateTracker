@@ -76,6 +76,9 @@ For the state pass, I use Gemini 3 Flash with medium reasoning.
   </figure>
 </div>
 
+## Basic Video Walkthrough
+https://www.youtube.com/watch?v=_okVtTb_ajw
+
 ## License
 MIT
 
