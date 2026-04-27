@@ -1,4 +1,4 @@
-**⚠️ Important recent changes: https://www.youtube.com/watch?v=1n5x7VBJ0IU**
+**⚠️ Important recent changes: https://www.youtube.com/watch?v=1n5x7VBJ0IU. More info in v1.4.0 patch notes under releases.**
 
 **"Fatbody D&D gives you the Private Pyle experience."** —Gny. Sgt. Hartman
 
