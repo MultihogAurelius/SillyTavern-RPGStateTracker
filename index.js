@@ -2693,10 +2693,19 @@
                 toastr['success'](`Profile "${name}" overwritten.`, 'RPG Tracker');
             });
 
-            $('#rpg_tracker_profile_save_as').on('click', function () {
+            $('#rpg_tracker_profile_save_as').on('click', async function () {
                 const sel = /** @type {HTMLSelectElement} */ (document.getElementById('rpg_tracker_profile_select'));
                 const existing = sel.value;
-                const name = prompt('Save profile as:', existing || '')?.trim();
+                const { Popup } = SillyTavern.getContext();
+                
+                let name = null;
+                if (Popup && Popup.show && Popup.show.input) {
+                    name = await Popup.show.input('Save Profile', 'Save profile as:', existing || '');
+                } else {
+                    name = prompt('Save profile as:', existing || '');
+                }
+                
+                name = name?.trim();
                 if (!name) return;
                 saveProfile(name);
                 refreshProfileDropdown();
@@ -2711,11 +2720,19 @@
                 toastr['success'](`Profile "${name}" loaded.`, 'RPG Tracker');
             });
 
-            $('#rpg_tracker_profile_delete').on('click', function () {
+            $('#rpg_tracker_profile_delete').on('click', async function () {
                 const sel = /** @type {HTMLSelectElement} */ (document.getElementById('rpg_tracker_profile_select'));
                 const name = sel.value;
                 if (!name) return toastr['info']('No profile selected.', 'RPG Tracker');
-                if (!confirm(`Delete profile "${name}"?`)) return;
+                
+                const { Popup, POPUP_RESULT } = SillyTavern.getContext();
+                if (Popup && Popup.show && Popup.show.confirm) {
+                    const confirmResult = await Popup.show.confirm('Delete Profile', `Delete profile "${name}"?`);
+                    if (confirmResult !== POPUP_RESULT.AFFIRMATIVE) return;
+                } else {
+                    if (!confirm(`Delete profile "${name}"?`)) return;
+                }
+                
                 deleteProfile(name);
                 refreshProfileDropdown();
                 toastr['success'](`Profile "${name}" deleted.`, 'RPG Tracker');
