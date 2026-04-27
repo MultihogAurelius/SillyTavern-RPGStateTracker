@@ -8,7 +8,7 @@ All notable changes to the **Fatbody D&D Framework** will be documented in this 
 - **Mobile Profile Management**: Resolved an issue where saving, loading, or deleting profiles would fail on mobile devices (especially iOS PWAs).
   - Replaced native `prompt()` and `confirm()` calls with SillyTavern's built-in async modal system.
   - Implemented an async event-handling pattern for the Profile UI to support non-blocking user input.
-- **RNG UI Tweak**: Relocated the RNG Physics Engine button to the absolute bottom edge of the tracker panel and reduced its visual footprint for a cleaner layout.
+- **RNG UI Tweak**: Relocated the RNG Physics Engine toggle directly into the footer navigation bar as a professional, horizontally-centered pill button.
 
 ## [1.3.2] - 2026-04-26
 

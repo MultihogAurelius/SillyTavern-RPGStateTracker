@@ -1677,15 +1677,15 @@
                     <span class="rpg-tracker-nav-label" id="rpg-tracker-nav-label">Live</span>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-nav-fwd" title="View next snapshot">→</button>
                 </div>
+                <button id="rt-rng-toggle-overlay" class="rt-rng-toggle-overlay" title="Toggle RNG Injection">
+                    <i class="fa-solid fa-dice"></i> RNG Physics Engine: <span id="rt-rng-status-text">OFF</span>
+                </button>
                 <div class="flex-container gap-1 alignitemscenter">
                     <span id="rpg-tracker-count">chars: ${settings.currentMemo.length}</span>
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
                     <button class="rpg-tracker-nav-btn" id="rt-copy-sysprompt" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Copy Narrator System Prompt (sysprompt.txt)">SYSPROMPT</button>
                 </div>
             </div>
-            <button id="rt-rng-toggle-overlay" class="rt-rng-toggle-overlay" title="Toggle RNG Injection">
-                <i class="fa-solid fa-dice"></i> RNG Physics Engine: <span id="rt-rng-status-text">OFF</span>
-            </button>
         `;
 
         document.body.appendChild(panel);

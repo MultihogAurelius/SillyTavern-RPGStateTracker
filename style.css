@@ -1252,29 +1252,25 @@
 }
 
 .rt-rng-toggle-overlay {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.2);
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--rt-text-muted);
-    padding: 3px 10px;
+    padding: 2px 8px;
     font-size: 9px;
     cursor: pointer;
-    text-align: center;
+    border-radius: 4px;
     transition: all 0.2s ease;
     font-family: var(--rt-font);
     display: flex;
-    justify-content: center;
     align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
+    gap: 5px;
+    white-space: nowrap;
 }
 
 .rt-rng-toggle-overlay:hover {
     background: var(--rt-accent-bg);
-    color: var(--rt-text);
+    border-color: var(--rt-accent-dim);
+    color: var(--rt-accent);
 }
 
 .rt-rng-toggle-overlay.active {
