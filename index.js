@@ -322,35 +322,51 @@
      * Event handler for GENERATION_ENDED.
      * Triggers the State Model pass ONLY after the entire generation loop (including tool calls) finishes.
      */
+    /**
+     * Helper to collect the full AI narrative since the last user message.
+     * Stitches together multi-part responses from tool call loops.
+     */
+    function getNarrativeSinceLastUser(chat) {
+        if (!chat || chat.length === 0) return "";
+        let narrativeBlocks = [];
+
+        for (let i = chat.length - 1; i >= 0; i--) {
+            const msg = chat[i];
+            if (msg.is_user) break;
+            if (msg.is_system || /** @type {any} */ (msg).is_hidden) continue;
+
+            let mes = (msg.mes || '').trim();
+            if (!mes) continue;
+
+            // Ignore typical "summary" patterns
+            if (mes.startsWith('[Summary') || mes.startsWith('(Summary') || mes.includes('Summary of past events:')) continue;
+            if (msg.extra?.['summary'] || msg.extra?.['is_summary'] || msg.extra?.['summary_data']) continue;
+
+            // ─── Strip Tool Call UI ───
+            // SillyTavern embeds tool calls and reasoning in <details> and <pre> blocks.
+            // These bloat the state model prompt and can confuse it.
+            mes = mes.replace(/<details\b[^>]*>([\s\S]*?)<\/details>/gi, '');
+            mes = mes.replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, '');
+            mes = mes.trim();
+
+            if (mes) {
+                narrativeBlocks.unshift(mes);
+            }
+        }
+        return narrativeBlocks.join('\n\n');
+    }
+
     async function onGenerationEnded() {
         const settings = getSettings();
         if (!settings.enabled || _stateModelRunning) return;
 
         const { chat } = SillyTavern.getContext();
-        const lastMsg = chat[chat.length - 1];
+        const combinedNarrative = getNarrativeSinceLastUser(chat);
 
-        // ─── Filter out non-narrative messages ───
-        // 1. Basic ST types
-        if (!lastMsg || lastMsg.is_user || lastMsg.is_system || /** @type {any} */ (lastMsg).is_hidden) return;
+        if (!combinedNarrative) return;
 
-        const mes = (lastMsg.mes || '').trim();
-
-        // 2. Ignore typical "summary" patterns (including Summaryception default templates)
-        // This prevents the tracker from parsing summaries as actual story narrative.
-        if (mes.startsWith('[Summary') || mes.startsWith('(Summary') || mes.includes('Summary of past events:')) {
-            if (settings.debugMode) console.log("[RPG Tracker] Ignoring message: summary pattern detected.");
-            return;
-        }
-
-        // 3. Ignore messages with specialized extension metadata that usually shouldn't be parsed
-        if (lastMsg.extra?.['summary'] || lastMsg.extra?.['is_summary'] || lastMsg.extra?.['summary_data']) return;
-
-        // 4. Ignore messages that are explicitly tool calls/responses (if any slip through)
-        if (lastMsg.extra?.tool_calls || lastMsg.extra?.api_calls) return;
-
-        if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Triggering State Model pass...");
-
-        runStateModelPass(mes);
+        if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Triggering State Model pass...", combinedNarrative);
+        runStateModelPass(combinedNarrative);
     }
 
     /**
@@ -2033,20 +2049,12 @@
         // Manual update from panel button
         const manualUpdate = async (isFullContext = false) => {
             const { chat } = SillyTavern.getContext();
-            if (!chat || chat.length === 0) return toastr['info']("No chat history found.", "RPG Tracker");
+            const narrative = getNarrativeSinceLastUser(chat);
 
-            let lastAssistantMsg = "";
-            for (let i = chat.length - 1; i >= 0; i--) {
-                if (!chat[i].is_user && !chat[i].is_system) {
-                    lastAssistantMsg = chat[i].mes;
-                    break;
-                }
-            }
-
-            if (!isFullContext && !lastAssistantMsg) return toastr['info']("No assistant message to parse.", "RPG Tracker");
+            if (!isFullContext && !narrative) return toastr['info']("No assistant message to parse.", "RPG Tracker");
 
             toastr['info'](isFullContext ? "Triggering Full Context Audit..." : "Triggering manual State Update...", "RPG Tracker");
-            await runStateModelPass(lastAssistantMsg, isFullContext);
+            await runStateModelPass(narrative, isFullContext);
         };
 
         const updateBtn = panel.querySelector('#rpg-tracker-update-btn');
