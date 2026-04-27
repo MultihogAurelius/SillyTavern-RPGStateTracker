@@ -1927,7 +1927,7 @@
                         <h4 style="color: var(--rt-accent);">Tool Call RNG (Narrative)</h4>
                         <p>A reactive tool call where the AI proactively asks to roll specific dice for a specific action (e.g., picking a lock). This prevents "cheating" by forcing the AI to commit to a difficulty (DC) before seeing the roll result.</p>
                         <p style="background: rgba(255, 165, 0, 0.1); border-left: 3px solid orange; padding: 10px; font-size: 11px; color: #eee; border-radius: 0 4px 4px 0;">
-                            <b>NOTE:</b> "Enable function calling" <b>must</b> be enabled in SillyTavern's <b>AI Response Configuration</b> for tool calls to work.
+                            <b>NOTE:</b> "Enable function calling" <b>must</b> be enabled in SillyTavern's <b>AI Response Configuration</b> for tool calls to work. If tool calls are unreliable with your model, try disabling <b>Streaming</b>.
                         </p>
                         
                         <h4 style="color: var(--rt-accent);">System Prompt Selection</h4>
