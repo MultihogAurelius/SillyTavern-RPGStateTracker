@@ -1253,13 +1253,12 @@
 
 .rt-rng-toggle-overlay {
     width: 100%;
-    background: var(--rt-card-header);
+    background: rgba(0, 0, 0, 0.2);
     border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--rt-text-muted);
-    padding: 8px;
-    font-size: 11px;
+    padding: 3px 10px;
+    font-size: 9px;
     cursor: pointer;
     text-align: center;
     transition: all 0.2s ease;
@@ -1267,8 +1266,10 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
 .rt-rng-toggle-overlay:hover {
@@ -1283,6 +1284,6 @@
 }
 
 .rt-rng-toggle-overlay i {
-    font-size: 14px;
+    font-size: 10px;
 }
 

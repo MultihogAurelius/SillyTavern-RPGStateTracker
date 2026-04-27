@@ -1671,9 +1671,6 @@
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
                 <button class="rpg-tracker-prompt-send" id="rpg-tracker-prompt-send" title="Send instruction">▶</button>
             </div>
-            <button id="rt-rng-toggle-overlay" class="rt-rng-toggle-overlay" title="Toggle RNG Injection">
-                <i class="fa-solid fa-dice"></i> RNG Physics Engine: <span id="rt-rng-status-text">OFF</span>
-            </button>
             <div class="rpg-tracker-footer">
                 <div class="rpg-tracker-nav">
                     <button class="rpg-tracker-nav-btn" id="rpg-tracker-nav-back" title="View previous snapshot">←</button>
@@ -1686,6 +1683,9 @@
                     <button class="rpg-tracker-nav-btn" id="rt-copy-sysprompt" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Copy Narrator System Prompt (sysprompt.txt)">SYSPROMPT</button>
                 </div>
             </div>
+            <button id="rt-rng-toggle-overlay" class="rt-rng-toggle-overlay" title="Toggle RNG Injection">
+                <i class="fa-solid fa-dice"></i> RNG Physics Engine: <span id="rt-rng-status-text">OFF</span>
+            </button>
         `;
 
         document.body.appendChild(panel);
