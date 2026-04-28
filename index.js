@@ -50,16 +50,33 @@
             diceFunctionTool: true,
             systemPromptTemplate:
                 "You are the State Extractor Model. Your task is to maintain a structured State Memo based on the roleplay narrative.\n" +
+                "<core_directives>\n" +
                 "IGNORE NARRATIVE FLUFF: Do not track temporary dialogue or actions. Only track persistent state changes.\n" +
                 "INTEGRATION: Track all durations stated by the narrative (e.g. 'poisoned for 3 turns'). Decrement by 1 each round in [COMBAT]. For out-of-combat durations, calculate the delta between the current [TIME] and the [TIME] in the PRIOR MEMO.\n" +
                 "CREATION: You MAY create a section that did not exist in the Prior Memo when the narrative warrants it based on your enabled modules.\n" +
                 "DELETION: To REMOVE a section entirely, you MUST output: `[TAG]REMOVED[/TAG]`.\n" +
-                "You must track the following enabled modules:\n{{modulesText}}\n" +
-                "RULES:\n" +
+                "</core_directives>\n\n" +
+                "<modules>\n" +
+                "You must track the following enabled modules:\n" +
+                "{{modulesText}}\n" +
+                "</modules>\n\n" +
+                "<list_formatting>\n" +
+                "For sections with multiple items ([ABILITIES], [INVENTORY], [SPELLS], [PARTY]):\n" +
+                "1. Use a bulleted list with `-`.\n" +
+                "2. Format: `- Name (Resource/Max, Effect Description)`.\n" +
+                "3. If no resource tracker is needed, use: `- Name (Effect Description)`.\n" +
+                "4. The parentheses MUST contain the resource count FIRST, followed by a comma, then the description.\n" +
+                "</list_formatting>\n\n" +
+                "<rules>\n" +
                 "1. Read the PRIOR MEMO and the NARRATIVE OUTPUT carefully.\n" +
                 "2. Determine which sections changed. Only output sections that actually changed.\n" +
                 "3. Use strict [TAG]...[/TAG] structure based on the modules requested above. ALWAYS include the closing tag.\n" +
-                "   EXAMPLE FORMATTING:\n" +
+                "4. Omit unchanged sections entirely. Do NOT output a section if its contents did not change.\n" +
+                "5. BLOCK PERSISTENCE: For list-based sections ([PARTY], [INVENTORY], [ABILITIES], [SPELLS], [COMBAT]), if any single item within that section changes, you MUST re-output the ENTIRE section containing all items. Never omit existing members or items unless they are explicitly logically removed.\n" +
+                "6. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
+                "7. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n" +
+                "</rules>\n\n" +
+                "<formatting_examples>\n" +
                 "   [TIME]\n" +
                 "   8:43 AM, Day 1\n" +
                 "   [/TIME]\n\n" +
@@ -68,28 +85,34 @@
                 "   Level 1 | STR 8, DEX 14, CON 14\n" +
                 "   Saves: Fort +4 | Ref +2 | Will -1\n" +
                 "   [/CHARACTER]\n\n" +
+                "   [ABILITIES]\n" +
+                "   - Second Wind (1/1, Regain 1d10+4 HP)\n" +
+                "   - Combat Superiority (2/4, d8 dice)\n" +
+                "   - Darkvision (60ft range)\n" +
+                "   [/ABILITIES]\n\n" +
                 "   [COMBAT]\n" +
                 "   Combat Round 1\n" +
                 "   Goblin: 7/7 HP | AC: 15 | Saves: Fort +1, Ref +2, Will +0 | Status: Healthy\n" +
                 "   [/COMBAT]\n\n" +
                 "   [XP]\n" +
                 "   Level: 1 | XP: 100/300\n" +
-                "   [/XP]\n\n" +
-                "4. Omit unchanged sections entirely. Do NOT output a section if its contents did not change.\n" +
-                "5. BLOCK PERSISTENCE: For list-based sections ([PARTY], [INVENTORY], [ABILITIES], [SPELLS], [COMBAT]), if any single item within that section changes, you MUST re-output the ENTIRE section containing all items. Never omit existing members or items unless they are explicitly logically removed.\n" +
-                "6. If there are absolutely NO CHANGES to any section, you MUST output exactly: `NO_CHANGES_DETECTED`\n" +
-                "7. Output ONLY the changed sections (or NO_CHANGES_DETECTED). No preamble, no explanation, no commentary.\n\n" +
-                "REGARDING COMBAT:\n" +
+                "   [/XP]\n" +
+                "</formatting_examples>\n\n" +
+                "<combat_logic>\n" +
                 "1. [COMBAT] section is only created when actual combat begins, not when enemies are simply present in the scene.\n" +
-                "2. If an entity dies in combat, output it as 0/X HP, for example \"Shambling Corpse B (Fodder): 0/9 HP | AC: 10,\" do not omit it completely from the next state.\n\n" +
-                "BUFFS:\n" +
+                "2. If an entity dies in combat, output it as 0/X HP, for example \"Shambling Corpse B (Fodder): 0/9 HP | AC: 10,\" do not omit it completely from the next state.\n" +
+                "</combat_logic>\n\n" +
+                "<buff_debuff_logic>\n" +
                 "Duration Tracking: Record all durations explicitly. Use turns for combat (e.g., for 3 turns) and H:M for narrative time (e.g., 1h 30m).\n" +
                 "Restoration Anchors: When a buff or debuff modifies a base statistic (AC, Attributes, etc.), record the base value directly in the respective field—e.g., 'AC 18 (base 13)'.\n" +
                 "Status Formatting: Output the buff/debuff in the Status line with its absolute mathematical effect in parentheses. Example: 'Shield (+5 AC, 1 turn)'.\n" +
                 "Auto-Reversion: During each State Sync, check if a duration has expired. If it has, use the modifier in the Status line to reverse the math on the base statistic (e.g., subtracting the +5 AC), restore the field, and remove the buff from the list.\n" +
-                "Conditional Buffs: For effects without a set time, use event-based anchors. Example: 'Exhaustion (Disadvantage on Ability Checks, until Long Rest)'.\n\n" +
-                "LEVEL UPS:\n" +
-                "Update abilities/attributes/HP/etc accordingly, such as an ability's 1d6 bonus increasing to 2d6, etc.",
+                "Conditional Buffs: For effects without a set time, use event-based anchors. Example: 'Exhaustion (Disadvantage on Ability Checks, until Long Rest)'.\n" +
+                "STATUS LABELING: In [CHARACTER], [PARTY], and [COMBAT] blocks, prefix positive status effects (buffs) with `(+)` and negative status effects (debuffs) with `(-)`. Every status MUST include its effect AND duration in parentheses. Example: `Status: (+) Heroism (+2 Temp HP per turn, 9 turns), (-) Poisoned (Disadvantage on attacks, 2 turns)`. Healthy or no effects needs no prefix.\n" +
+                "</buff_debuff_logic>\n\n" +
+                "<progression_logic>\n" +
+                "Update abilities/attributes/HP/etc accordingly, such as an ability's 1d6 bonus increasing to 2d6, etc.\n" +
+                "</progression_logic>",
             modules: {
                 character: true,
                 party: true,
@@ -1028,16 +1051,35 @@
 
     const renderPills = (text) => {
         return splitSmart(text).map(t => {
-            const m = t.match(/^(.+?)\s*\((.+)\)$/);
+            // Detect buff/debuff prefix
+            let pillClass = 'rt-unit-pill';
+            let displayText = t;
+            if (t.startsWith('(+)') || t.startsWith('(+) ')) {
+                pillClass += ' rt-pill-buff';
+                displayText = t.replace(/^\(\+\)\s*/, '');
+            } else if (t.startsWith('(-)') || t.startsWith('(-) ')) {
+                pillClass += ' rt-pill-debuff';
+                displayText = t.replace(/^\(-\)\s*/, '');
+            }
+
+            const m = displayText.match(/^(.+?)\s*\((.+)\)$/);
             if (m) {
                 const [, name, desc] = m;
-                return `<span class="rt-unit-pill">
+                
+                // Extract resource count if present (e.g., "2/3")
+                let iconHtml = '';
+                const resourceMatch = desc.match(/(\d+)\s*\/\s*(\d+)/);
+                if (resourceMatch) {
+                    iconHtml = `<span class="rt-unit-icon">${escapeHtml(resourceMatch[0])}</span>`;
+                }
+
+                return `<span class="${pillClass}">
                     <span class="rt-unit-name">${escapeHtml(name)}</span>
-                    <span class="rt-unit-icon">i</span>
+                    ${iconHtml}
                     <span class="rt-unit-descr">${escapeHtml(desc)}</span>
                 </span>`;
             }
-            return `<span class="rt-unit-pill no-desc"><span class="rt-unit-name">${escapeHtml(t)}</span></span>`;
+            return `<span class="${pillClass} no-desc"><span class="rt-unit-name">${escapeHtml(displayText)}</span></span>`;
         }).join('');
     };
 
@@ -1157,8 +1199,8 @@
                                         <span class="rt-entity-sub-label">Saves:</span> ${highlightParens(escapeHtml(part.substring(6).trim()))}
                                     </div>`;
                                 } else if (part.toLowerCase().startsWith('status:')) {
-                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line">
-                                        <span class="rt-entity-sub-label">Status:</span> ${highlightParens(escapeHtml(part.substring(7).trim()))}
+                                    results[lastEntityIdx] += `<div class="rt-entity-sub-line rt-units-container">
+                                        <span class="rt-entity-sub-label">Status:</span> ${renderPills(part.substring(7).trim())}
                                     </div>`;
                                 } else if (part.toLowerCase().startsWith('other:') || part.toLowerCase().startsWith('res:')) {
                                     const label = part.toLowerCase().startsWith('res:') ? 'Res:' : 'Other:';
@@ -1203,8 +1245,8 @@
                         results[lastEntityIdx] += savesHtml;
                     } else if (line.toLowerCase().startsWith('status:') && lastEntityIdx !== -1) {
                         const statusText = line.substring(7).trim();
-                        const statusHtml = `<div class="rt-entity-sub-line">
-                            <span class="rt-entity-sub-label">Status:</span> <span>${highlightParens(escapeHtml(statusText))}</span>
+                        const statusHtml = `<div class="rt-entity-sub-line rt-units-container">
+                            <span class="rt-entity-sub-label">Status:</span> ${renderPills(statusText)}
                         </div>`;
                         results[lastEntityIdx] += statusHtml;
                     } else if ((line.toLowerCase().startsWith('primary weapon:') || line.toLowerCase().startsWith('att/def:')) && lastEntityIdx !== -1) {

@@ -755,20 +755,20 @@
 }
 
 .rt-unit-icon {
-    width: 13px;
-    height: 13px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
     background: var(--rt-accent-dim);
     color: var(--rt-accent);
-    border-radius: 50%;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 900;
     line-height: 1;
-    font-family: "Times New Roman", serif;
-    font-style: italic;
-    opacity: 0.8;
+    font-family: "Inter", sans-serif;
+    opacity: 0.9;
 }
 
 .rt-unit-descr {
@@ -816,6 +816,33 @@
 .rt-units-container:has(.rt-unit-pill.active) .rt-unit-pill:not(.active):hover .rt-unit-descr,
 .rt-abilities-body:has(.rt-unit-pill.active) .rt-unit-pill:not(.active):hover .rt-unit-descr {
     display: none !important;
+}
+
+/* ── Status Pill Color Variants ── */
+.rt-pill-buff {
+    background: rgba(0, 200, 100, 0.1);
+    border-color: rgba(0, 200, 100, 0.3);
+}
+.rt-pill-buff:hover, .rt-pill-buff.active {
+    background: rgba(0, 200, 100, 0.22);
+    border-color: rgba(0, 220, 120, 0.6);
+}
+.rt-pill-buff .rt-unit-icon {
+    background: rgba(0, 200, 100, 0.2);
+    color: rgb(0, 220, 120);
+}
+
+.rt-pill-debuff {
+    background: rgba(220, 50, 50, 0.1);
+    border-color: rgba(220, 50, 50, 0.3);
+}
+.rt-pill-debuff:hover, .rt-pill-debuff.active {
+    background: rgba(220, 50, 50, 0.22);
+    border-color: rgba(255, 80, 80, 0.6);
+}
+.rt-pill-debuff .rt-unit-icon {
+    background: rgba(220, 50, 50, 0.2);
+    color: rgb(255, 80, 80);
 }
 
 .rt-entity-sub-line {

@@ -2,10 +2,14 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
-## [1.4.5] - 2026-04-28
+## [1.5.0] - 2026-04-28
 
 ### Added
-- **Automatic State Deduplication**: Implemented a "Post-Pass Cleanup" layer that automatically detects and removes duplicate state blocks (e.g., multiple `[CHARACTER]` tags). It enforces a "Last Block Wins" rule to ensure a clean, single source of truth for the UI.
+- **Visual Status System**: Status effects are now color-coded. Buffs (marked with `(+)`) are Emerald Green, and Debuffs (marked with `(-)`) are Crimson Red.
+- **Resource Capsule Icons**: Replaced the generic information icon with dynamic resource trackers. If an ability or spell has a usage count (e.g., `2/3`), it is displayed directly in the pill icon.
+- **XML-Structured Instructions**: Completely refactored the State Model prompt using semantic XML tagging for vastly improved instruction following and clarity.
+- **Enhanced Status Labeling**: Standardized status formatting to ensure both mathematical effects and durations are preserved in the HUD.
+- **Dynamic Adaptive Icons**: Pill icons now expand into capsules to support multi-digit resource counts (like `10/10`) with improved typography.
 
 ## [1.4.4] - 2026-04-28
 
