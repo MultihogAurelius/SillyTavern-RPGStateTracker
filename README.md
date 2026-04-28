@@ -68,7 +68,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 4. **Validation:** Use the Delta Log (δ) to verify changes. If the AI ever makes a mistake, step backwards using the Snapshot Navigation (←/→) to restore a clean state. Not really needed much in my experience, but the option is there.
 
 ## Basic Video Walkthrough
-https://www.youtube.com/watch?v=wg0JMMwqiUA
+https://www.youtube.com/watch?v=1n5x7VBJ0IU
 
 ## Don't Care About D&D?
 
