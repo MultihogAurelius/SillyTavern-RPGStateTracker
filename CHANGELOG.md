@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.4.5] - 2026-04-28
+
+### Added
+- **Automatic State Deduplication**: Implemented a "Post-Pass Cleanup" layer that automatically detects and removes duplicate state blocks (e.g., multiple `[CHARACTER]` tags). It enforces a "Last Block Wins" rule to ensure a clean, single source of truth for the UI.
+
 ## [1.4.4] - 2026-04-28
 
 ### Added

@@ -508,6 +508,47 @@
     }
 
     /**
+     * Sanitizes a memo string to ensure no duplicate [TAG] sections exist.
+     * If duplicates are found, the last one in the string is preserved.
+     */
+    function deduplicateMemo(memo) {
+        if (!memo) return "";
+        const settings = getSettings();
+        
+        // Find all tags in the string
+        const tagRegex = /\[([A-Z_]+)\]/gi;
+        const tags = new Set();
+        let match;
+        while ((match = tagRegex.exec(memo)) !== null) {
+            tags.add(match[1].toUpperCase());
+        }
+
+        let cleanedMemo = memo;
+        for (const tag of tags) {
+            const escapedTag = escapeRegex(tag);
+            const pattern = new RegExp(`\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'gi');
+            const blocks = [...memo.matchAll(pattern)];
+
+            if (blocks.length > 1) {
+                if (settings.debugMode) console.warn(`[RPG Tracker] Deduplication: Found ${blocks.length} instances of [${tag}]. Keeping the last one.`);
+                
+                // Remove all instances of the tag
+                cleanedMemo = cleanedMemo.replace(pattern, "---DEDUP_MARKER---");
+                
+                // Put back only the last one
+                const lastBlock = blocks[blocks.length - 1][0];
+                
+                // We use a temporary marker to avoid double-replacing if the tag content 
+                // accidentally contains its own tag name.
+                const split = cleanedMemo.split("---DEDUP_MARKER---");
+                cleanedMemo = split.join("").trim() + "\n\n" + lastBlock;
+            }
+        }
+
+        return cleanedMemo.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    /**
      * Merge partial AI output into the existing memo.
      * Finds all [TAG]...[/TAG] blocks in the AI output and replaces the
      * matching section in the current memo. New sections are appended.
@@ -568,8 +609,9 @@
             }
         }
 
-        // Final cleanup of double newlines that might occur during removal
-        return memo.replace(/\n{3,}/g, '\n\n').trim();
+        // Final cleanup and deduplication
+        const cleaned = memo.replace(/\n{3,}/g, '\n\n').trim();
+        return deduplicateMemo(cleaned);
     }
 
     function escapeRegex(str) {
