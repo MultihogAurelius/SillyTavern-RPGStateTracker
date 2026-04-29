@@ -1401,3 +1401,53 @@
     color: var(--rt-accent);
 }
 
+/* ── Mobile Layout Fixes ── */
+@media (max-width: 600px) {
+    .rpg-tracker-footer {
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 8px 4px !important;
+        height: auto !important;
+    }
+
+    /* Hide character count on mobile to save space */
+    #rpg-tracker-count {
+        display: none !important;
+    }
+
+    /* Hide long labels on mobile RNG buttons */
+    .rt-rng-label-text {
+        display: none !important;
+    }
+
+    .rt-rng-footer-group {
+        width: 100%;
+        justify-content: space-around;
+        gap: 4px !important;
+    }
+
+    .rt-rng-toggle-overlay {
+        flex: 1;
+        justify-content: center;
+        padding: 6px 2px !important;
+        font-size: 10px !important;
+        min-height: 28px;
+    }
+
+    #rt-rng-help-btn {
+        flex: 0 0 40px !important;
+        min-width: 40px !important;
+    }
+
+    /* Stack the nav and utility groups */
+    .rpg-tracker-nav {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .rpg-tracker-footer .flex-container:last-child {
+        width: 100%;
+        justify-content: center;
+    }
+}
+

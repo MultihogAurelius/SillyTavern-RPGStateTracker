@@ -2,7 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
-## [1.5.2] - 2026-04-29
+## [1.5.3] - 2026-04-29
+
+### Added
+- **Mobile UI Optimization**: Implemented responsive CSS for mobile devices (max-width 600px).
+- **Adaptive Footer**: The bottom bar now stacks vertically on mobile, hides the character counter, and uses compact labels to prevent button overlapping and ensure reliable touch targets.
 
 ### Changed
 - **Initiative System**: Shifted pre-combat initiative rolls from the RNG Queue to the Tool Call system for better narrative integration.
