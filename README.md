@@ -71,7 +71,7 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 3. **Prompt Injection & Execution:** The State Memo and RNG Queue are injected seamlessly into your outgoing prompt to act as the "source of truth." For narrative actions, the framework dynamically catches and resolves the AI's `RollTheDice` tool calls.
 4. **Validation:** Use the Delta Log (δ) to verify changes. If the AI ever makes a mistake, step backwards using the Snapshot Navigation (←/→) to restore a clean state. Not really needed much in my experience, but the option is there.
 
-## Basic Video Walkthrough
+## Basic Video Walkthrough of the RNG System
 https://www.youtube.com/watch?v=1n5x7VBJ0IU
 
 ## Suggested Companions
