@@ -32,14 +32,6 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 ⚠️ **NOTE: if you close the UI window, it can be reopened from the wand menu.**
 
-## Installation
-
-**The packaged releases will likely not be up to date. I recommend cloning the repo or taking the steps below.**
-
-1. Go to the SillyTavern extension menu.
-2. Click on "Install extension" at the top.
-3. Enter this repo's URL.
-
 ## Highlights
 
 - **Dual-Engine Physics**: Deterministic queue for instant combat, and interactive tool calls for narrative skill checks.
@@ -64,9 +56,13 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
   </figure>
 </div>
 
-## Suggested Companions
+## Installation
 
-- 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
+**The packaged releases will likely not be up to date. I recommend cloning the repo or taking the steps below.**
+
+1. Go to the SillyTavern extension menu.
+2. Click on "Install extension" at the top.
+3. Enter this repo's URL.
 
 ## Usage Guide
 
@@ -77,6 +73,10 @@ Together they solve the two core problems of LLM tabletop RP: the AI forgets you
 
 ## Basic Video Walkthrough
 https://www.youtube.com/watch?v=1n5x7VBJ0IU
+
+## Suggested Companions
+
+- 🧠 **[Summaryception](https://github.com/Lodactio/Extension-Summaryception):** A brilliant summarizer/context compression extension. Also handy for crunching all the combat mechanics of the context into summarized history.
 
 ## Don't Care About D&D?
 
