@@ -4300,7 +4300,7 @@ Rules:
                 ta.select();
                 try {
                     document.execCommand('copy');
-                    toastr['success'](`${fileName} copied to clipboard!`, "Fatbody Framework");
+                    toastr['success'](`${fileName} copied to clipboard! Make sure to enable tool calls in the completion preset!`, "Fatbody Framework");
                     syspromptMenu.style.display = 'none';
                 } catch (err) {
                     console.error("[Fatbody Framework] execCommand copy failed:", err);
@@ -5891,7 +5891,7 @@ Rules:
                     ta.select();
                     try {
                         document.execCommand('copy');
-                        toastr['warning']('All prompts reset. Quick Prompt "Main" textarea not found (wrong API mode?). Sysprompt copied to clipboard instead — paste it manually.', 'RPG Tracker');
+                        toastr['warning']('All prompts reset. Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard — paste it manually and enable tool calls in the completion preset!', 'RPG Tracker');
                     } catch (e) {
                         toastr['warning']('All prompts reset. Quick Prompt "Main" textarea not found and clipboard copy failed. Use the SYSPROMPT button to copy manually.', 'RPG Tracker');
                     } finally {
@@ -5952,7 +5952,7 @@ Rules:
                     } else {
                         try {
                             await navigator.clipboard.writeText(content);
-                            toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard \u2705', 'RPG Tracker');
+                            toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard. Make sure to enable tool calls in the completion preset! \u2705', 'RPG Tracker');
                         } catch (e) {
                             toastr['warning']('Quick Prompt "Main" textarea not found and clipboard copy failed.', 'RPG Tracker');
                         }
