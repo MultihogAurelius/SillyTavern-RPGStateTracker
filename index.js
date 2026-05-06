@@ -17,6 +17,7 @@
     const MODULE_NAME = "rpg_tracker";
     let _stateModelRunning = false;
     let _currentChatId = null;
+    let themeUndoStack = [];
 
     const EXAMPLES = `((B)) Health: 45/100
 ((XB)) Level 3: 1,200/2,700 XP
@@ -832,6 +833,10 @@ Rules:
         }
 
         // Save and apply
+        if (settings.customTheme) {
+            themeUndoStack.push(JSON.parse(JSON.stringify(settings.customTheme)));
+            if (themeUndoStack.length > 20) themeUndoStack.shift(); // Limit stack size
+        }
         settings.customTheme = vars;
         // Ensure custom theme is selected
         settings.trackerTheme = 'rt-theme-custom';
@@ -5595,13 +5600,21 @@ Rules:
                     toastr['success'](`Saved "${name}" to library.`, 'Theme Library');
                 }
             });
-            document.getElementById('rpg_tracker_theme_wizard_reset')?.addEventListener('click', () => {
-                settings.customTheme = null;
+            document.getElementById('rpg_tracker_theme_wizard_undo')?.addEventListener('click', () => {
+                if (themeUndoStack.length === 0) {
+                    toastr['info']('No steps to undo.', 'Theme Wizard');
+                    return;
+                }
+                const prev = themeUndoStack.pop();
+                settings.customTheme = prev;
                 ctx.saveSettingsDebounced();
-                applyCustomTheme(null);
+                applyCustomTheme(prev);
                 const statusEl = document.getElementById('rpg_tracker_theme_wizard_status');
-                if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'inherit'; statusEl.textContent = 'Custom theme cleared.'; }
-                refreshSavedThemesList();
+                if (statusEl) { 
+                    statusEl.style.display = 'block'; 
+                    statusEl.style.color = 'inherit'; 
+                    statusEl.textContent = `Undone last change. (${themeUndoStack.length} steps remaining)`; 
+                }
             });
 
             refreshSavedThemesList();
