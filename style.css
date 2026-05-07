@@ -211,14 +211,32 @@
     border-color: var(--rt-accent);
 }
 
-.rpg-tracker-panel.is-paused {
-    opacity: 0.75;
-    filter: grayscale(0.4) brightness(0.9);
+/* Disabled via the settings checkbox — full transparency */
+.rpg-tracker-panel.is-disabled {
+    opacity: 0.35;
+    filter: grayscale(0.6) brightness(0.8);
+    pointer-events: none;
 }
 
+/* Paused via the pause button — visible but indicating pause */
 .rpg-tracker-panel.is-paused .rpg-tracker-memo-area,
 .rpg-tracker-panel.is-paused .rpg-tracker-render-view {
-    opacity: 0.6;
+    opacity: 0.85;
+}
+
+/* Header center for pause banner */
+.rpg-tracker-header-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--rt-accent, #f0a050);
+    opacity: 0.9;
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 .rpg-tracker-header {
@@ -233,6 +251,7 @@
     font-size: 0.9em;
     user-select: none;
     flex-shrink: 0;
+    position: relative;
 }
 
 .rpg-tracker-header-left {

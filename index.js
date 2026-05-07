@@ -1375,7 +1375,7 @@ Rules:
 
     globalThis.rpgTrackerInterceptor = async function (chat, contextSize, abort, type) {
         const settings = getSettings();
-        if (!settings.enabled) return;
+        if (!settings.enabled || settings.paused) return;
 
         // Find the last user message to prepend injections
         let idx = -1;
@@ -1462,7 +1462,7 @@ Rules:
 
     async function onGenerationEnded() {
         const settings = getSettings();
-        if (!settings.enabled || _stateModelRunning) return;
+        if (!settings.enabled || settings.paused || _stateModelRunning) return;
 
         const { chat } = SillyTavern.getContext();
         const combinedNarrative = getNarrativeBlocks(chat, -1);
@@ -1474,26 +1474,41 @@ Rules:
     }
 
     /**
-     * Update the visual status of the panel (active, running, paused)
+     * Update the visual status of the panel (active, running, paused, disabled)
      */
     function updatePanelStatus() {
         const settings = getSettings();
         const panel = document.getElementById('rpg-tracker-panel');
         const indicator = document.getElementById('rpg-tracker-status');
         const pauseBtn = document.getElementById('rpg-tracker-pause-btn');
+        const pauseBanner = document.getElementById('rpg-tracker-pause-banner');
 
         if (!panel || !indicator || !pauseBtn) return;
 
-        if (settings.enabled) {
+        if (!settings.enabled) {
+            // Fully disabled — transparent panel, no banner
+            panel.classList.add('is-disabled');
+            panel.classList.remove('is-paused');
+            indicator.classList.remove('active');
+            pauseBtn.textContent = '▶';
+            pauseBtn.title = 'Resume Tracker';
+            if (pauseBanner) pauseBanner.textContent = '';
+        } else if (settings.paused) {
+            // Paused — visible panel, pause banner shown
+            panel.classList.remove('is-disabled');
+            panel.classList.add('is-paused');
+            indicator.classList.add('active');
+            pauseBtn.textContent = '▶';
+            pauseBtn.title = 'Resume Tracker';
+            if (pauseBanner) pauseBanner.textContent = 'TRACKER UPDATES PAUSED';
+        } else {
+            // Active
+            panel.classList.remove('is-disabled');
             panel.classList.remove('is-paused');
             indicator.classList.add('active');
             pauseBtn.textContent = '⏸';
             pauseBtn.title = 'Pause Tracker';
-        } else {
-            panel.classList.add('is-paused');
-            indicator.classList.remove('active');
-            pauseBtn.textContent = '▶';
-            pauseBtn.title = 'Resume Tracker';
+            if (pauseBanner) pauseBanner.textContent = '';
         }
 
         if (_stateModelRunning) {
@@ -3760,6 +3775,7 @@ Rules:
                     <button class="rpg-tracker-stop-btn" id="rpg-tracker-stop-btn" title="Stop Generation" style="display:none;">■</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-chat-link-btn" style="font-size:13px;" title="Chat Link ON">🔗</button>
                 </div>
+                <div class="rpg-tracker-header-center" id="rpg-tracker-pause-banner"></div>
                 <div class="rpg-tracker-header-right">
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
@@ -3852,13 +3868,9 @@ Rules:
             pauseBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const s = getSettings();
-                s.enabled = !s.enabled;
+                // Pause button only toggles the paused state, not the enabled state
+                s.paused = !s.paused;
                 SillyTavern.getContext().saveSettingsDebounced();
-
-                // Update settings UI checkbox if it exists
-                const cb = document.getElementById('rpg_tracker_enabled');
-                if (cb instanceof HTMLInputElement) cb.checked = s.enabled;
-
                 updatePanelStatus();
             });
         }
@@ -5256,6 +5268,7 @@ Rules:
             $('#rpg_tracker_enabled').prop('checked', settings.enabled).on('change', function () {
                 settings.enabled = !!$(this).prop('checked');
                 ctx.saveSettingsDebounced();
+                updatePanelStatus();
             });
 
             $('#rpg_tracker_debug').prop('checked', settings.debugMode).on('change', function () {
@@ -5579,7 +5592,7 @@ Rules:
                 const panel = document.getElementById('rpg-tracker-panel');
                 if (panel) {
                     panel.className = `rpg-tracker-panel ${newTheme}`;
-                    if (!settings.enabled) panel.classList.add('is-paused');
+                    if (!settings.enabled) panel.classList.add('is-disabled');
                 }
                 document.querySelectorAll('.rpg-tracker-detached-panel').forEach(dp => {
                     dp.className = `rpg-tracker-panel rpg-tracker-detached-panel ${newTheme}`;
