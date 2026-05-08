@@ -3497,8 +3497,10 @@ Rules:
                     settings.prevMemo2 = "";
                     settings.memoHistory = [];
                     settings.lastDelta = "";
+                    settings.quests = [];
                     saveSettings();
                     updateUIMemo("");
+                    refreshRenderedView();
                     const dp = document.getElementById('rpg-tracker-delta-content');
                     if (dp) dp.innerHTML = '<span class="delta-empty">Log cleared.</span>';
                     toastr['success']("RPG Tracker logic wiped.", "RPG Tracker");
