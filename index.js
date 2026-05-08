@@ -2661,11 +2661,17 @@ Rules:
      */
     function buildSysprompt(rawText) {
         if (!rawText) return "";
-        const mods = getSettings().syspromptModules || {};
+        const s = getSettings();
+        const mods = s.syspromptModules || {};
+        const isLegacy = !!s.questLegacyMode;
+
         return rawText
             .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
-                // Only remove if the toggle is explicitly set to false
-                if (mods[tag] === false) return "";
+                // Mutual exclusion: legacy mode strips <quests>, tool mode strips <quests_legacy>
+                if (tag === 'quests'         &&  isLegacy) return '';
+                if (tag === 'quests_legacy'  && !isLegacy) return '';
+                // Honour the syspromptModules toggle for other tags
+                if (mods[tag] === false) return '';
                 return match;
             })
             .replace(/\n{3,}/g, "\n\n")
@@ -3380,6 +3386,37 @@ Rules:
                     ctx.saveSettingsDebounced();
                 });
             });
+
+            // Legacy Quest Mode toggle
+            const _legacyModeEl = /** @type {HTMLInputElement} */ (document.getElementById('rpg_quest_legacy_mode'));
+            if (_legacyModeEl) {
+                _legacyModeEl.checked = !!getSettings().questLegacyMode;
+                _legacyModeEl.addEventListener('change', function () {
+                    const fresh = getSettings();
+                    fresh.questLegacyMode = !!this.checked;
+                    // Swap the stock prompt slot to match the mode
+                    if (fresh.questLegacyMode) {
+                        if (!fresh.stockPrompts) fresh.stockPrompts = {};
+                        // Store tool prompt if we haven't yet, then load legacy
+                        if (!fresh._questToolPromptBackup) fresh._questToolPromptBackup = fresh.stockPrompts.quests;
+                        const { DEFAULT_STOCK_PROMPTS: DSP } = /** @type {any} */ ({ DEFAULT_STOCK_PROMPTS: window.__rpgDefaultStockPrompts || {} });
+                        import('./constants.js').then(({ DEFAULT_STOCK_PROMPTS }) => {
+                            fresh.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests_legacy;
+                            ctx.saveSettingsDebounced();
+                        });
+                    } else {
+                        // Restore tool-mode prompt
+                        import('./constants.js').then(({ DEFAULT_STOCK_PROMPTS }) => {
+                            const fresh2 = getSettings();
+                            fresh2.stockPrompts.quests = fresh2._questToolPromptBackup ?? DEFAULT_STOCK_PROMPTS.quests;
+                            delete fresh2._questToolPromptBackup;
+                            ctx.saveSettingsDebounced();
+                        });
+                    }
+                    registerLogQuestTool();
+                    ctx.saveSettingsDebounced();
+                });
+            }
 
             $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
                 const fileName = 'sysprompt.txt';

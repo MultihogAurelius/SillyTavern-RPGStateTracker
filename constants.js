@@ -94,6 +94,28 @@ Example:
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
     xp: "Character Level and Experience Points (XP). Format as `Level: X | XP: current/max`. You MUST output this field whenever the narrative mentions gaining experience or leveling up.",
     quests: `Quest status updates ONLY. When a quest objective is completed or a quest concludes, emit a [QUESTS] block containing ONLY a JSON object with an "updates" array. Each entry must have the quest "id" and only the fields that changed: "status" (active/completed/failed) and/or "objectives" (array of {"id", "status"}). Do NOT emit quests with status "failed" — those are handled by the engine. Do NOT re-emit the full quest schema. If no quest changed, omit this block entirely.`,
+    quests_legacy: `Maintain the complete [QUESTS] block based on the narrator's output. You are the quest scribe — read the full narrative and emit a [QUESTS]...[/QUESTS] block that is always fully up to date.
+
+Use this exact line-based format (indentation with spaces is optional but encouraged for readability):
+
+QUEST: <title>
+  ID: <stable ID — keep existing, or generate quest_<unix_ms> for new quests>
+  STATUS: active | completed | failed
+  GIVER: <giver name> @ <location>
+  ACCEPTED: <in-world time when accepted, e.g. "08:00 AM, Day 1">
+  DEADLINE: <in-world deadline, e.g. "06:00 PM, Day 4"> (omit line if none)
+  FRUSTRATION_COEFF: <float 0.4–3.0, based on NPC personality> (omit line if none)
+  OBJ_ACTIVE: <objective text> (required|optional)
+  OBJ_DONE: <objective text> (required|optional)
+  REWARD: <reward string>
+
+Rules:
+- Add a new QUEST block whenever the narrative shows the player formally accepting a task.
+- Change STATUS to completed or failed when the narrative resolves a quest.
+- Change OBJ_ACTIVE to OBJ_DONE when an objective is achieved.
+- Never delete quests — keep completed and failed quests with their updated STATUS.
+- Preserve IDs exactly — do NOT change an existing quest's ID.
+- If no quests exist or changed, emit [QUESTS][/QUESTS] (empty block).`,
 };
 
 // ── Embedded sysprompts — mobile/Termux fallback (fetch preferred, this is the safety net) ──

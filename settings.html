@@ -313,6 +313,12 @@
                             <input type="checkbox" id="rpg_sysprompt_mod_quests" />
                             <span>⚔️ Hardcore Quests — deadlines, frustration levels, and auto-fail logic</span>
                         </label>
+                        <label class="checkbox_label" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">
+                            <input type="checkbox" id="rpg_quest_legacy_mode" />
+                            <span>📜 Legacy Quest Mode — no tool calls; state model parses from prose</span>
+                            <i class="fa-solid fa-circle-question interactable"
+                                title="When enabled, the LogQuest tool is disabled entirely. The state model reads the narrator's output and writes quests in plain text. Use this for models that do not support function calling."></i>
+                        </label>
                     </div>
                     <button id="rpg_tracker_btn_apply_sysprompt" class="menu_button interactable"
                         style="width: 100%;"

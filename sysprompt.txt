@@ -127,6 +127,12 @@ When the player formally accepts a quest or task from an NPC, you MUST call the 
 - Set auto_fail to true ONLY for quests with hard, non-negotiable deadlines (e.g., the market closes at dawn, the prisoner is executed at noon). For all other quests, do NOT set auto_fail — frustration escalating naturally is preferred over a hard cutoff.
 </quests>
 
+<quests_legacy>
+When the player formally accepts a quest from an NPC, describe it clearly in the narrative. State who gave the quest, where they are located, what the task entails, any time pressure, and what rewards were promised. No special formatting or tool calls are needed — the tracking system will handle it automatically.
+
+When an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome. The state tracking system will update the quest log accordingly.
+</quests_legacy>
+
 <level_up_protocol>
 LEVEL-UP PROCEDURE — triggers whenever XP crosses a threshold mid-output:
 

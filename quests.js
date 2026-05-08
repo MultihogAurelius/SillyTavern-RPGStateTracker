@@ -181,11 +181,14 @@ export function registerLogQuestTool() {
         const s = getSettings();
         const { registerFunctionTool, unregisterFunctionTool } = SillyTavern.getContext();
         
+        // Unregister first (idempotent)
+        unregisterFunctionTool('LogQuest');
+
+        // In legacy mode, the state model handles quests — no tool needed
+        if (s.questLegacyMode) return;
+
         // Only register if the module is enabled
-        if (!s.modules?.quests) {
-            unregisterFunctionTool('LogQuest');
-            return;
-        }
+        if (!s.modules?.quests) return;
 
         const isHardcore = s.syspromptModules?.quests !== false;
 

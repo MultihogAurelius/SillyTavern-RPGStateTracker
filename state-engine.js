@@ -87,9 +87,21 @@ export function mergeMemo(currentMemo, aiOutput) {
         const tag = match[1].trim();
         const newContent = match[2].trim();
 
-        // [QUESTS] block contains JSON — route to quest merger
+    // [QUESTS] block — route to appropriate handler based on mode
         if (tag.toUpperCase() === 'QUESTS') {
-            mergeQuestUpdates(newContent);
+            const s = getSettings();
+            if (s.questLegacyMode) {
+                // Legacy: state model wrote the full text block — parse it wholesale
+                const parsed = parseQuestsFromText(newContent);
+                if (parsed) {
+                    s.quests = parsed;
+                    SillyTavern.getContext().saveSettingsDebounced();
+                    syncQuestsToMemo();
+                }
+            } else {
+                // Tool mode: state model emits a diff JSON
+                mergeQuestUpdates(newContent);
+            }
             // Do NOT continue — we want the [QUESTS] block to be replaced/inserted in the memo string
         }
 
@@ -141,7 +153,7 @@ export function mergeQuestUpdates(jsonText) {
     try {
         parsed = JSON.parse(jsonText);
     } catch (e) {
-        console.warn('[RPG Tracker] mergeQuestUpdates: invalid JSON in [QUESTS] block:', jsonText);
+        console.warn('[RPG Tracker] mergeQuestUpdates: invalid JSON in [QUESTS] diff block:', jsonText);
         return;
     }
 
@@ -152,7 +164,7 @@ export function mergeQuestUpdates(jsonText) {
     for (const update of updates) {
         const quest = settings.quests.find(q => q.id === update.id);
         if (!quest) continue;
-        if (quest.status === 'failed') continue; // locked — script already handled this
+        if (quest.status === 'failed') continue;
 
         if (update.status && ['active', 'completed'].includes(update.status)) {
             quest.status = update.status;
@@ -174,30 +186,140 @@ export function mergeQuestUpdates(jsonText) {
     if (changed) {
         if (settings.debugMode) console.log('[RPG Tracker] mergeQuestUpdates: applied quest state changes.');
         SillyTavern.getContext().saveSettingsDebounced();
-        // After merging updates, we MUST rebuild the [QUESTS] block in the memo to reflect the new state
         syncQuestsToMemo();
     }
 }
 
 /**
- * Rebuilds the [QUESTS] block in settings.currentMemo using the full state in settings.quests.
- * This ensures Raw View and Internal State are always in sync.
+ * Rebuilds the [QUESTS] block in settings.currentMemo from settings.quests.
+ * Uses plain-text format in legacy mode, JSON in tool mode.
  */
 export function syncQuestsToMemo() {
     const settings = getSettings();
     if (!settings.quests) return;
 
-    const fullJson = JSON.stringify(settings.quests, null, 2);
+    const content = settings.questLegacyMode
+        ? serializeQuestsToText(settings.quests)
+        : JSON.stringify(settings.quests, null, 2);
+
     const tag = 'QUESTS';
     const escapedTag = escapeRegex(tag);
     const pattern = new RegExp(`\\s*\\[${escapedTag}\\][\\s\\S]*?\\[\\/${escapedTag}\\]`, 'i');
-    const block = `\n\n[${tag}]\n${fullJson}\n[/${tag}]`;
+    const block = `\n\n[${tag}]\n${content}\n[/${tag}]`;
 
     if (pattern.test(settings.currentMemo)) {
         settings.currentMemo = settings.currentMemo.replace(pattern, block);
     } else {
         settings.currentMemo = (settings.currentMemo + block).trim();
     }
+}
+
+// ── Legacy quest text format ───────────────────────────────────────────────────
+
+/**
+ * Parses the state model's plain-text quest format into settings.quests[].
+ * Each quest block starts with "QUEST: <title>" and contains labeled key: value lines.
+ * @param {string} text - Content inside [QUESTS]...[/QUESTS]
+ * @returns {object[]|null} Array of quest objects, or null on complete parse failure.
+ */
+export function parseQuestsFromText(text) {
+    if (!text || !text.trim()) return [];
+
+    const questBlocks = text.trim().split(/^QUEST:/m);
+    const quests = [];
+
+    for (const block of questBlocks) {
+        if (!block.trim()) continue;
+
+        const lines = block.split('\n');
+        const title = lines[0].trim();
+        if (!title) continue;
+
+        /** @param {string} key */
+        const getField = (key) => {
+            const re = new RegExp(`^\\s*${key}:\\s*(.+)$`, 'mi');
+            const m = block.match(re);
+            return m ? m[1].trim() : null;
+        };
+
+        const rawGiver  = getField('GIVER') || '';
+        const giverParts = rawGiver.split(' @ ');
+        const giverName = giverParts[0]?.trim() || 'Unknown';
+        const giverLoc  = giverParts[1]?.trim() || 'Unknown';
+
+        const rawCoeff = getField('FRUSTRATION_COEFF');
+        const coeff = rawCoeff ? parseFloat(rawCoeff) : null;
+
+        // Objectives: OBJ_ACTIVE or OBJ_DONE lines
+        const objectives = [];
+        const objRe = /^\s*(OBJ_ACTIVE|OBJ_DONE):\s*(.+)$/gmi;
+        let objMatch;
+        let objIdx = 0;
+        while ((objMatch = objRe.exec(block)) !== null) {
+            const isDone  = objMatch[1].toUpperCase() === 'OBJ_DONE';
+            const content = objMatch[2].trim();
+            const isOptional = /\(optional\)$/i.test(content);
+            const objText = content.replace(/\s*\((required|optional)\)\s*$/i, '').trim();
+            objectives.push({
+                id:       `obj_${objIdx++}`,
+                text:     objText,
+                required: !isOptional,
+                status:   isDone ? 'completed' : 'active',
+            });
+        }
+
+        // Rewards: REWARD lines
+        const rewards = [];
+        const rewardRe = /^\s*REWARD:\s*(.+)$/gmi;
+        let rewardMatch;
+        while ((rewardMatch = rewardRe.exec(block)) !== null) {
+            rewards.push(rewardMatch[1].trim());
+        }
+
+        quests.push({
+            id:                     getField('ID') || `quest_${Date.now()}_${quests.length}`,
+            title,
+            status:                 getField('STATUS') || 'active',
+            giver_name:             giverName,
+            giver_location:         giverLoc,
+            accepted_time:          getField('ACCEPTED'),
+            deadline_time:          getField('DEADLINE'),
+            frustration_coefficient: coeff !== null && !isNaN(coeff) ? coeff : undefined,
+            objectives,
+            rewards,
+        });
+    }
+
+    return quests;
+}
+
+/**
+ * Converts settings.quests[] back to the plain-text format for the Raw View.
+ * @param {object[]} quests
+ * @returns {string}
+ */
+export function serializeQuestsToText(quests) {
+    if (!quests || !quests.length) return '';
+
+    return quests.map(q => {
+        const lines = [`QUEST: ${q.title}`];
+        lines.push(`  ID: ${q.id}`);
+        lines.push(`  STATUS: ${q.status || 'active'}`);
+        lines.push(`  GIVER: ${q.giver_name} @ ${q.giver_location}`);
+        if (q.accepted_time)          lines.push(`  ACCEPTED: ${q.accepted_time}`);
+        if (q.deadline_time)          lines.push(`  DEADLINE: ${q.deadline_time}`);
+        if (q.frustration_coefficient != null)
+                                      lines.push(`  FRUSTRATION_COEFF: ${q.frustration_coefficient}`);
+        for (const obj of (q.objectives || [])) {
+            const tag    = obj.status === 'completed' ? 'OBJ_DONE' : 'OBJ_ACTIVE';
+            const suffix = obj.required ? '(required)' : '(optional)';
+            lines.push(`  ${tag}: ${obj.text} ${suffix}`);
+        }
+        for (const r of (q.rewards || [])) {
+            lines.push(`  REWARD: ${r}`);
+        }
+        return lines.join('\n');
+    }).join('\n\n');
 }
 
 /**
@@ -210,7 +332,6 @@ export function syncQuestsFromMemo(memoText) {
     const match = memoText.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
 
     if (!match) {
-        // If the block is entirely missing from the memo, clear the internal state
         if (settings.quests && settings.quests.length > 0) {
             settings.quests = [];
             if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: quests cleared because [QUESTS] block was removed.');
@@ -218,15 +339,25 @@ export function syncQuestsFromMemo(memoText) {
         return;
     }
 
-    try {
-        const parsed = JSON.parse(match[1]);
-        if (Array.isArray(parsed)) {
+    const content = match[1].trim();
+
+    // Auto-detect format: plain-text starts with QUEST:, otherwise try JSON
+    if (content.startsWith('QUEST:') || settings.questLegacyMode) {
+        const parsed = parseQuestsFromText(content);
+        if (parsed) {
             settings.quests = parsed;
-            if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from memo edit.');
+            if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from plain-text edit.');
         }
-    } catch (e) {
-        // Silently fail or log — user might be mid-edit
-        if (settings.debugMode) console.warn('[RPG Tracker] syncQuestsFromMemo: invalid JSON in quest block. Error:', e.message);
+    } else {
+        try {
+            const parsed = JSON.parse(content);
+            if (Array.isArray(parsed)) {
+                settings.quests = parsed;
+                if (settings.debugMode) console.log('[RPG Tracker] syncQuestsFromMemo: updated internal state from JSON edit.');
+            }
+        } catch (e) {
+            if (settings.debugMode) console.warn('[RPG Tracker] syncQuestsFromMemo: could not parse quest block. Error:', e.message);
+        }
     }
 }
 
