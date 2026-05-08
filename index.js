@@ -1081,9 +1081,9 @@ Rules:
 
             let html = renderMemoAsCards(memo, null, _sectionPages);
 
-            // Append quest log section if module is enabled
-            if (s.modules?.quests) {
-                html += renderQuestLog(s.quests || [], currentTime, collapsed, detached);
+            // Append quest log section if module is enabled and there are quests
+            if (s.modules?.quests && s.quests?.length) {
+                html += renderQuestLog(s.quests, currentTime, collapsed, detached);
             }
 
             el.innerHTML = html;
