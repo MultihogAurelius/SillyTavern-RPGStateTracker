@@ -102,7 +102,8 @@ export function mergeMemo(currentMemo, aiOutput) {
                 // Tool mode: state model emits a diff JSON
                 mergeQuestUpdates(newContent);
             }
-            // Do NOT continue — we want the [QUESTS] block to be replaced/inserted in the memo string
+            // Skip the standard string replacement below — syncQuestsToMemo handled it
+            continue;
         }
 
         const isRemoval = /^(?:REMOVED|EXPIRED|CLEARED|NONE|END_COMBAT)$/i.test(newContent);
