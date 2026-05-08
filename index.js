@@ -2662,14 +2662,18 @@ Rules:
     function buildSysprompt(rawText) {
         if (!rawText) return "";
         const s = getSettings();
-        const mods = s.syspromptModules || {};
-        const isLegacy = !!s.questLegacyMode;
+        const isLegacyQuests  = !!s.questLegacyMode;
+        const isLegacyRolling = !!s.legacyRollingMode;
 
         return rawText
             .replace(/<(\w[\w_-]*)>([\s\S]*?)<\/\1>/g, (match, tag) => {
-                // Mutual exclusion: legacy mode strips <quests>, tool mode strips <quests_legacy>
-                if (tag === 'quests'         &&  isLegacy) return '';
-                if (tag === 'quests_legacy'  && !isLegacy) return '';
+                // Mutual exclusion for Quests
+                if (tag === 'quests'         &&  isLegacyQuests) return '';
+                if (tag === 'quests_legacy'  && !isLegacyQuests) return '';
+                // Mutual exclusion for Rolling
+                if (tag === 'rng_system'     &&  isLegacyRolling) return '';
+                if (tag === 'rng_system_legacy' && !isLegacyRolling) return '';
+
                 // Honour the syspromptModules toggle for other tags
                 if (mods[tag] === false) return '';
                 return match;
@@ -3414,6 +3418,18 @@ Rules:
                         });
                     }
                     registerLogQuestTool();
+                    ctx.saveSettingsDebounced();
+                });
+            }
+
+            // Legacy Rolling Mode toggle
+            const _legacyRollingEl = /** @type {HTMLInputElement} */ (document.getElementById('rpg_legacy_rolling_mode'));
+            if (_legacyRollingEl) {
+                _legacyRollingEl.checked = !!getSettings().legacyRollingMode;
+                _legacyRollingEl.addEventListener('change', function () {
+                    const fresh = getSettings();
+                    fresh.legacyRollingMode = !!this.checked;
+                    registerDiceFunctionTool();
                     ctx.saveSettingsDebounced();
                 });
             }

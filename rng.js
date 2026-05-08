@@ -106,6 +106,7 @@ export function registerDiceFunctionTool() {
         unregisterFunctionTool('FatbodyRollTheDice');
 
         const settings = getSettings();
+        if (settings.legacyRollingMode) return; // Legacy: prose-based rolling
         if (!settings.diceFunctionTool) return;
 
         const toolName = getDiceToolName();
