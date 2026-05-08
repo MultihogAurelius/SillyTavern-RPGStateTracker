@@ -902,7 +902,7 @@ Rules:
                     Ideal for combat because initiative creates a deterministic "grid," removing any opportunity for the AI to game the outcome. This is why it's the default method for combat—it reduces token costs massively, minimizes latency, and is more reliable due to its reduced structural complexity.`
                 )}
                 ${card('🔧', 'Tool Call RNG <span style="font-weight:normal;opacity:0.6;">(Narrative)</span>',
-                    `A reactive system where the AI proactively calls a dice tool for a specific narrative action (e.g., picking a lock, persuading a guard). The AI must declare a <b>Difficulty Class (DC)</b> before seeing the result, which prevents sycophancy—it can't retroactively make rolls "just good enough" to succeed.`
+                    `A reactive system where the AI proactively calls a dice tool for a specific narrative action (e.g., picking a lock, persuading a guard). The AI must declare a <b>Difficulty Class (DC)</b> before seeing the result. This ensures it can't "game the system" by lowering the DC to fit a roll or skipping the roll entirely—while rare with the Queue system, this prevents even the possibility of narrative sycophancy.`
                 )}
                 <div style="background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.25); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 0.88em; text-align: left;">
                     <b style="color: #ffcc33;">⚠ Requirements for Tool Call RNG:</b><br>
