@@ -322,9 +322,9 @@ export function registerLogQuestTool() {
                         status: 'active'
                     })),
                     rewards: args.rewards || [],
-                    deadline_time: args.deadline_time || null,
-                    frustration_coefficient: args.frustration_coefficient || 1.0,
-                    auto_fail: args.auto_fail !== false,
+                    deadline_time: isDeadlines ? (args.deadline_time || null) : undefined,
+                    frustration_coefficient: isFrustration ? (args.frustration_coefficient || 1.0) : undefined,
+                    auto_fail: (isDeadlines && !isFrustration) ? (args.auto_fail !== false) : undefined,
                     accepted_time: acceptedTime,
                     status: 'active'
                 };

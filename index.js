@@ -3541,6 +3541,8 @@ Rules:
                     if (fresh.questLegacyMode) {
                         refreshQuestLegacyPrompt(fresh);
                         refreshOrderList();
+                    } else {
+                        registerLogQuestTool();
                     }
                     saveSettings();
                 });
@@ -3559,6 +3561,8 @@ Rules:
                     if (fresh.questLegacyMode) {
                         refreshQuestLegacyPrompt(fresh);
                         refreshOrderList();
+                    } else {
+                        registerLogQuestTool();
                     }
                     saveSettings();
                 });
