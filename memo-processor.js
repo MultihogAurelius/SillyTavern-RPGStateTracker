@@ -11,9 +11,60 @@
 
 import { getSettings } from './state-manager.js';
 import { DEFAULT_STOCK_PROMPTS } from './constants.js';
-import { getQuestMood } from './quests.js';
 
 // ── String utilities ──────────────────────────────────────────────────────────
+
+/**
+ * Computes NPC mood from -1.0 (very pleased) to 1.0+ (very frustrated).
+ * Duplicated here from quests.js to avoid a circular import.
+ * @param {object} quest
+ * @param {string} currentTime
+ * @returns {number}
+ */
+function computeFrustrationLocal(quest, currentTime) {
+    if (!quest.deadline_time || !quest.accepted_time) return 0;
+    const coeff = (quest.frustration_coefficient != null) ? quest.frustration_coefficient : 1.0;
+    const acceptedMins  = parseInWorldTime(quest.accepted_time);
+    const deadlineMins  = parseInWorldTime(quest.deadline_time);
+    const currentMins   = parseInWorldTime(currentTime);
+    if (!acceptedMins || !deadlineMins || !currentMins) return 0;
+    const total = deadlineMins - acceptedMins;
+    if (total <= 0) return 0;
+    const ratio = (currentMins - acceptedMins) / total;
+    if (ratio <= 1) {
+        return ratio - 1; // pre-deadline: -1 → 0
+    } else {
+        return (ratio - 1) * coeff; // post-deadline: 0 → positive
+    }
+}
+
+/**
+ * Returns the human-readable mood label and color for a quest.
+ * @param {object} quest
+ * @param {string} currentTime
+ * @param {boolean} showFrustration
+ * @returns {{ label: string, color: string, value: number }}
+ */
+export function getQuestMood(quest, currentTime, showFrustration) {
+    const frust = computeFrustrationLocal(quest, currentTime);
+    let color = '#00cc77';
+    let label = 'Pleased';
+    if (showFrustration) {
+        if (frust <= -0.5)      { color = '#00cc77'; label = 'Very Pleased'; }
+        else if (frust <= -0.1) { color = '#44dd88'; label = 'Pleased'; }
+        else if (frust <=  0.1) { color = '#aaaaaa'; label = 'Neutral'; }
+        else if (frust <=  0.5) { color = '#ffcc00'; label = 'Mildly Frustrated'; }
+        else if (frust <=  1.0) { color = '#ff8800'; label = 'Frustrated'; }
+        else if (frust <=  1.5) { color = '#ff4400'; label = 'Very Frustrated'; }
+        else                    { color = '#ff1111'; label = 'Furious'; }
+    } else {
+        if (frust <= 0)         { color = '#00cc77'; label = 'Ahead of Schedule'; }
+        else if (frust <= 0.5)  { color = '#ffcc00'; label = 'On Time'; }
+        else if (frust <= 1.0)  { color = '#ff8800'; label = 'Near Deadline'; }
+        else                    { color = '#ff1111'; label = 'Overdue'; }
+    }
+    return { label, color, value: frust };
+}
 
 export function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

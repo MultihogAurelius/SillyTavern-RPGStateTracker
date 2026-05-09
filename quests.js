@@ -62,38 +62,6 @@ export function computeFrustration(quest, currentTime) {
     }
 }
 
-/**
- * Returns the human-readable mood label and associated color for a quest,
- * based on the calculated frustration value and active settings.
- * @param {object} quest 
- * @param {string} currentTime 
- * @param {boolean} showFrustration 
- * @returns {{ label: string, color: string }}
- */
-export function getQuestMood(quest, currentTime, showFrustration) {
-    const frust = computeFrustration(quest, currentTime);
-    
-    let color = '#00cc77';
-    let label = 'Pleased';
-    
-    if (showFrustration) {
-        if (frust <= -0.5)      { color = '#00cc77'; label = 'Very Pleased'; }
-        else if (frust <= -0.1) { color = '#44dd88'; label = 'Pleased'; }
-        else if (frust <=  0.1) { color = '#aaaaaa'; label = 'Neutral'; }
-        else if (frust <=  0.5) { color = '#ffcc00'; label = 'Mildly Frustrated'; }
-        else if (frust <=  1.0) { color = '#ff8800'; label = 'Frustrated'; }
-        else if (frust <=  1.5) { color = '#ff4400'; label = 'Very Frustrated'; }
-        else                    { color = '#ff1111'; label = 'Furious'; }
-    } else {
-        // Deadline-only color scheme
-        if (frust <= 0)         { color = '#00cc77'; label = 'Ahead of Schedule'; }
-        else if (frust <= 0.5)  { color = '#ffcc00'; label = 'On Time'; }
-        else if (frust <= 1.0)  { color = '#ff8800'; label = 'Near Deadline'; }
-        else                    { color = '#ff1111'; label = 'Overdue'; }
-    }
-    
-    return { label, color, value: frust };
-}
 
 // ── State Management ─────────────────────────────────────────────────────────
 
