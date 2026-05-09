@@ -330,14 +330,16 @@ export function parseQuestsFromText(text) {
         const rawCoeff = getField('FRUSTRATION_COEFF');
         const coeff = rawCoeff ? parseFloat(rawCoeff) : null;
 
-        // Objectives: OBJ_ACTIVE or OBJ_DONE lines
+        // Objectives: OBJ_ACTIVE, OBJ_COMPLETED/OBJ_DONE, or OBJ_FAILED lines
         // Robust: handles both one-per-line and comma-separated objectives on a single line
         const objectives = [];
-        const objRe = /^\s*(OBJ_ACTIVE|OBJ_DONE):\s*(.+)$/gmi;
+        const objRe = /^\s*(OBJ_ACTIVE|OBJ_DONE|OBJ_COMPLETED|OBJ_FAILED):\s*(.+)$/gmi;
         let objMatch;
         let objIdx = 0;
         while ((objMatch = objRe.exec(block)) !== null) {
-            const isDone  = objMatch[1].toUpperCase() === 'OBJ_DONE';
+            const tag = objMatch[1].toUpperCase();
+            const isDone = (tag === 'OBJ_DONE' || tag === 'OBJ_COMPLETED');
+            const isFailed = (tag === 'OBJ_FAILED');
             const rawContent = objMatch[2].trim();
 
             // Detect comma-separated objectives: "Obj one (required), Obj two (optional)"
@@ -358,7 +360,7 @@ export function parseQuestsFromText(text) {
                     id:       `obj_${objIdx++}`,
                     text:     objText,
                     required: !isOptional,
-                    status:   isDone ? 'completed' : 'active',
+                    status:   isDone ? 'completed' : (isFailed ? 'failed' : 'active'),
                 });
             }
         }
@@ -406,7 +408,10 @@ export function serializeQuestsToText(quests) {
         if (q.frustration_coefficient != null)
                                       lines.push(`  FRUSTRATION_COEFF: ${q.frustration_coefficient}`);
         for (const obj of (q.objectives || [])) {
-            const tag    = obj.status === 'completed' ? 'OBJ_DONE' : 'OBJ_ACTIVE';
+            let tag = 'OBJ_ACTIVE';
+            if (obj.status === 'completed') tag = 'OBJ_COMPLETED';
+            else if (obj.status === 'failed') tag = 'OBJ_FAILED';
+            
             const suffix = obj.required ? '(required)' : '(optional)';
             lines.push(`  ${tag}: ${obj.text} ${suffix}`);
         }

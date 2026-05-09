@@ -105,8 +105,7 @@ QUEST: The Missing Sheep
   ACCEPTED: 08:00 AM, Day 1
   DEADLINE: 06:00 PM, Day 4
   FRUSTRATION_COEFF: 1.2
-  OBJ_ACTIVE: Find the missing sheep (required)
-- REWARD: one line per reward item. Omit if none.
+- Use OBJ_ACTIVE for ongoing steps, OBJ_COMPLETED for finished ones, and OBJ_FAILED for botched ones.
 - Never delete old quests. Keep completed/failed ones with updated STATUS.
 - If no quests exist yet, emit [QUESTS][/QUESTS] (empty).`,
 };
