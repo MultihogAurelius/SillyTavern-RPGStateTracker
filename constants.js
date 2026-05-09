@@ -106,19 +106,6 @@ QUEST: The Missing Sheep
   DEADLINE: 06:00 PM, Day 4
   FRUSTRATION_COEFF: 1.2
   OBJ_ACTIVE: Find the missing sheep (required)
-  OBJ_ACTIVE: Search the eastern forest (optional)
-  OBJ_DONE: Talk to Hemwick (required)
-  REWARD: 50 gold
-  REWARD: Old family heirloom
-
-Rules:
-- ID: Invent quest_<unix_ms> for new quests. Never change an existing quest's ID.
-- STATUS: active | completed | failed. Update when the narrative resolves a quest.
-- GIVER: always "Name @ Location".
-- ACCEPTED: in-world time the player agreed to the quest (e.g. "08:00 AM, Day 1").
-- DEADLINE / FRUSTRATION_COEFF: omit these lines entirely if not applicable.
-- FRUSTRATION_COEFF: 0.4 (very patient) → 1.0 (normal) → 3.0 (volatile). Assign based on the NPC's personality.
-- OBJ_ACTIVE: a pending objective. OBJ_DONE: a completed one. Change ACTIVE→DONE when achieved.
 - REWARD: one line per reward item. Omit if none.
 - Never delete old quests. Keep completed/failed ones with updated STATUS.
 - If no quests exist yet, emit [QUESTS][/QUESTS] (empty).`,

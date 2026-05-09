@@ -112,7 +112,7 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         closeCount: 0,
         lookbackMessages: 2,
         directPromptContext: 5,
-        trackerHistoryCount: 1,
+        historyIndex: -1,
         ctxWorldInfo: false,
         lorebookFilter: [],
         ollamaUrl: "http://localhost:11434",
@@ -242,6 +242,7 @@ export function saveChatState(chatId) {
         stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || DEFAULT_STOCK_PROMPTS)),
         customFields: JSON.parse(JSON.stringify(s.customFields || [])),
         quests:       JSON.parse(JSON.stringify(s.quests || [])),
+        historyIndex: s.historyIndex ?? -1,
     };
     SillyTavern.getContext().saveSettingsDebounced();
 }
@@ -264,7 +265,8 @@ export function saveProfile(name) {
         stockPrompts: JSON.parse(JSON.stringify(s.stockPrompts || DEFAULT_STOCK_PROMPTS)),
         customFields: JSON.parse(JSON.stringify(s.customFields || [])),
         quests: JSON.parse(JSON.stringify(s.quests || [])),
-        lastDelta: s.lastDelta || ''
+        lastDelta: s.lastDelta || '',
+        historyIndex: s.historyIndex ?? -1
     };
     s.activeProfile = name;
     SillyTavern.getContext().saveSettingsDebounced();

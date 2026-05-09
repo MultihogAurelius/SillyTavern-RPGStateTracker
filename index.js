@@ -118,6 +118,7 @@ import { registerLogQuestTool } from './quests.js';
         if (saved.customFields) s.customFields = JSON.parse(JSON.stringify(saved.customFields));
         if (saved.quests)       s.quests       = JSON.parse(JSON.stringify(saved.quests));
         else s.quests = [];
+        s.historyIndex = saved.historyIndex ?? -1;
 
         _historyViewIndex = -1;
         
@@ -685,8 +686,15 @@ Rules:
                     console.log(`[RPG Tracker] Memo ${merged !== sanitizedCurrent ? 'updated (partial merge)' : 'unchanged'}.`);
                 }
 
-                // Push snapshot to rolling history (max 5)
+                // Push snapshot to rolling history
                 const delta = computeDelta(sanitizedCurrent, merged);
+
+                if (settings.historyIndex !== -1) {
+                    if (settings.debugMode) console.log(`[RPG Tracker] Discarding ${settings.historyIndex} future snapshots due to new update.`);
+                    settings.memoHistory = settings.memoHistory.slice(settings.historyIndex + 1);
+                    settings.historyIndex = -1;
+                }
+
                 settings.memoHistory.unshift(sanitizedCurrent);
                 if (settings.memoHistory.length > 1000) settings.memoHistory.length = 1000;
 
@@ -1796,16 +1804,18 @@ Rules:
             }
         });
 
-        // Restore via label click
+        // Restore via label click (Commit)
         panel.querySelector('#rpg-tracker-nav-label').addEventListener('click', () => {
             const s = getSettings();
             if (_historyViewIndex === -1) return;
             const snapshot = s.memoHistory[_historyViewIndex];
             if (snapshot === undefined) return;
 
-            // Restore: set currentMemo, trim history forward from this point (discarding the 'future' snapshots)
-            s.memoHistory = s.memoHistory.slice(_historyViewIndex + 1);
+            // Commit: set currentMemo to this snapshot and mark our point in history.
+            // This allows us to "revert" the live state without losing the future history
+            // until a new AI generation actually overwrites it.
             s.currentMemo = snapshot;
+            s.historyIndex = _historyViewIndex;
             _historyViewIndex = -1;
             saveSettings();
             syncMemoView();
@@ -1834,14 +1844,21 @@ Rules:
     function navigateSnapshot(direction) {
         const s = getSettings();
         const maxIndex = s.memoHistory.length - 1;
-        const newIndex = _historyViewIndex + direction;
 
-        if (newIndex < -1 || newIndex > maxIndex) return;
-        _historyViewIndex = newIndex;
+        if (_historyViewIndex === -1) {
+            // Start from the restored point (or latest if none)
+            const start = s.historyIndex === -1 ? -1 : s.historyIndex;
+            _historyViewIndex = start + direction;
+        } else {
+            _historyViewIndex += direction;
+        }
+
+        // Clamp
+        if (_historyViewIndex < -1) _historyViewIndex = -1;
+        if (_historyViewIndex > maxIndex) _historyViewIndex = maxIndex;
+
         syncMemoView();
     }
-
-
 
     function syncMemoView() {
         const s = getSettings();
@@ -1858,12 +1875,20 @@ Rules:
             // Live view
             textarea.value = s.currentMemo;
             textarea.readOnly = false;
-            navLabel.textContent = '[ LIVE ]';
-            navLabel.classList.remove('clickable');
-            navLabel.title = 'Current Live State';
-            btnBack.disabled = histLen === 0;
-            btnFwd.disabled = true;
-            if (counter) counter.textContent = `~${Math.round(s.currentMemo.length / 2.62)} tokens`;
+            
+            if (s.historyIndex === -1) {
+                navLabel.textContent = '[ LIVE ]';
+                navLabel.classList.remove('clickable');
+                navLabel.title = 'Current Live State';
+                btnBack.disabled = histLen === 0;
+                btnFwd.disabled = true;
+            } else {
+                navLabel.textContent = `[ LIVE (-${s.historyIndex + 1}) ]`;
+                navLabel.classList.remove('clickable');
+                navLabel.title = 'Live State (Restored from History)';
+                btnBack.disabled = s.historyIndex >= histLen - 1;
+                btnFwd.disabled = false; // We can go forward to the "discarded" future
+            }
         } else {
             // Snapshot view
             const snapshot = s.memoHistory[_historyViewIndex];
@@ -1871,10 +1896,13 @@ Rules:
             textarea.readOnly = true;
             navLabel.textContent = `[ -${_historyViewIndex + 1} 🔄 ]`;
             navLabel.classList.add('clickable');
-            navLabel.title = 'Click to RESTORE this snapshot to Live';
+            navLabel.title = 'Click to RESTORE this state as LIVE';
             btnBack.disabled = _historyViewIndex >= histLen - 1;
-            btnFwd.disabled = false; // can always navigate forward toward Live
-            if (counter) counter.textContent = `~${Math.round((snapshot ?? '').length / 2.62)} tokens`;
+            btnFwd.disabled = false; // Always enabled because index -1 (Live) is forward
+        }
+
+        if (counter) {
+            counter.textContent = `~${Math.round(textarea.value.length / 2.62)} tokens`;
         }
         refreshRenderedView();
     }

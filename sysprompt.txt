@@ -114,19 +114,7 @@ Track XP as a running total across outputs. XP should be attributed for all mean
 </xp_system>
 
 <quests>
-When the player formally accepts a quest or task from an NPC, you MUST call the LogQuest tool immediately.
-- Define a clear Title, Giver Name, and Giver Location.
-- Break down the task into specific Objectives. Mark them as required or optional.
-- List all promised Rewards.
-- Assign an in-world Deadline (e.g., "08:00 PM, Day 3") if the quest is time-sensitive. When the current in-world time passes the deadline, update the quest status to "failed" unless an NPC explicitly grants an extension.
-- Set auto_fail to true for quests with hard deadlines; false for soft ones (e.g., an NPC who would accept a late delivery).
-- Set a frustration_coefficient (0.4 to 3.0) based on the NPC's personality:
-  · 0.4 = Very patient. Pleased if you arrive early, barely worried until near the deadline.
-  · 1.0 = Normal. Neutral at the halfway point, frustrated at the deadline.
-  · 3.0 = Volatile. Anxious and irritable even if you are ahead of schedule.
-- The NPC Mood evolves continuously on a scale from "Very Pleased" (early) to "Furious" (long overdue). Let this affect how the NPC speaks and acts when the player encounters them — a patient NPC barely mentions the quest until the deadline, while a volatile NPC may send messages or act with hostility long before it expires.
-- If a quest is time-sensitive and the deadline passes, update its status to "past deadline" rather than "failed". This allows the frustration system to continue escalating. Reserve the "failed" status only for quests that are logically impossible to complete or if an NPC explicitly calls it off. Do NOT set auto_fail to true when Frustration is enabled — the frustration coefficient handles consequences.
-- Describe the quest formalization in the narrative, conclude with the tag [QUEST ACCEPTED], and use the LogQuest tool exactly once. Do NOT do this for rumors, casual requests, or tasks the player has not yet agreed to.
+When the player formally accepts a quest or task from an NPC, you MUST call the LogQuest tool. Conclude your narrative with [QUEST ACCEPTED]. Do NOT do this for rumors, casual mentions, or tasks the player has not yet agreed to.
 </quests>
 
 <level_up_protocol>

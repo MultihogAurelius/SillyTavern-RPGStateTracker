@@ -188,50 +188,104 @@ export function registerLogQuestTool() {
         const isDeadlines = !!s.syspromptModules?.questsDeadlines;
         const isFrustration = !!s.syspromptModules?.questsFrustration;
 
+
+        // ── Build a dynamic tool description based on enabled features ──────────
+        let toolDescription =
+            'Log a new quest when the player formally accepts it from an NPC. ' +
+            'Call this ONCE per accepted quest. Do NOT call it for rumors, casual mentions, or unaccepted tasks. ' +
+            'Populate all fields from what was already established in the narrative.';
+
+        if (isDeadlines) {
+            toolDescription +=
+                ' If the quest is time-sensitive, supply deadline_time in the format "HH:MM AM/PM, Day N". ' +
+                (isFrustration
+                    ? 'Do NOT set auto_fail when Frustration is enabled — the frustration_coefficient handles consequences instead. ' +
+                      'Reserve status "failed" only for quests that are logically impossible to complete or explicitly called off by the NPC.'
+                    : 'Set auto_fail to true for hard deadlines (NPC will not accept a late delivery), false for soft ones.');
+        }
+
+        if (isFrustration) {
+            toolDescription +=
+                ' The NPC Mood evolves continuously based on frustration_coefficient. ' +
+                'Let this affect how the NPC speaks and acts whenever the player encounters them throughout the campaign.';
+        }
+
+        // ── Build per-parameter descriptions ─────────────────────────────────
         const properties = {
-            title: { type: 'string', description: 'Clear, thematic name of the quest.' },
-            giver_name: { type: 'string', description: 'Name of the NPC who gave the quest.' },
-            giver_location: { type: 'string', description: 'Where the NPC can be found.' },
+            title: {
+                type: 'string',
+                description: 'Clear, thematic name of the quest as established in the narrative.'
+            },
+            giver_name: {
+                type: 'string',
+                description: 'Full name of the NPC who issued the quest.'
+            },
+            giver_location: {
+                type: 'string',
+                description: 'Where this NPC can be found (e.g. "Crestwood Mill", "The Rusty Flagon Inn").'
+            },
             objectives: {
                 type: 'array',
+                description: 'Break the task into specific, concrete objectives. Include all sub-tasks mentioned by the NPC.',
                 items: {
                     type: 'object',
                     properties: {
-                        text: { type: 'string', description: 'The goal (e.g. "Kill the wolves").' },
-                        required: { type: 'boolean', description: 'True if required for quest completion.' },
+                        text: {
+                            type: 'string',
+                            description: 'A single, specific goal (e.g. "Kill the wolves in the eastern forest").'
+                        },
+                        required: {
+                            type: 'boolean',
+                            description: 'True if this objective is required for quest completion; false if it is optional.'
+                        },
                     },
                     required: ['text', 'required'],
                 },
             },
             rewards: {
                 type: 'array',
-                items: { type: 'string', description: 'Items or gold promised (e.g. "100 GP").' },
+                description: 'All rewards promised by the NPC. One entry per reward (e.g. "100 GP", "Elara\'s family heirloom").',
+                items: { type: 'string' },
             },
         };
 
         const required = ['title', 'giver_name', 'giver_location', 'objectives'];
 
-        // Add deadline fields only if Deadlines feature is enabled
         if (isDeadlines) {
-            properties.deadline_time = { type: 'string', description: 'When the quest must be done (e.g. "08:00 PM, Day 3"). Required for time-sensitive quests.' };
+            properties.deadline_time = {
+                type: 'string',
+                description:
+                    'In-world timestamp when the quest must be completed (e.g. "06:00 PM, Day 4"). ' +
+                    'Omit or set to null if there is no deadline. ' +
+                    'Use "none" only if the NPC explicitly stated there is no time pressure.'
+            };
             if (!isFrustration) {
-                // Without Frustration, auto_fail is the mechanism for quest failure
-                properties.auto_fail = { type: 'boolean', description: 'If true, the quest status is set to "failed" when the deadline passes. Use true for hard deadlines, false for soft ones.' };
+                properties.auto_fail = {
+                    type: 'boolean',
+                    description:
+                        'True = hard deadline: quest automatically fails when the deadline passes. ' +
+                        'False = soft deadline: the NPC will still accept the quest late, though they may be displeased. ' +
+                        'Default: false. Only set to true when the NPC made clear the timing is non-negotiable.'
+                };
             }
         }
 
-        // Add frustration fields only if Frustration feature is enabled
         if (isFrustration) {
-            properties.frustration_coefficient = { 
-                type: 'number', 
-                description: 'How patient the NPC is. 0.4 = very patient (starts pleased), 1.0 = normal, 3.0 = volatile (irritable well before the deadline). Default: 1.0.' 
+            properties.frustration_coefficient = {
+                type: 'number',
+                description:
+                    'How quickly this NPC\'s mood deteriorates as time passes. Scale: 0.4–3.0.\n' +
+                    '· 0.4 = Very patient. NPC is pleased if you arrive early; barely worried until near the deadline.\n' +
+                    '· 1.0 = Normal. NPC is neutral at the halfway point, frustrated only at the deadline.\n' +
+                    '· 3.0 = Volatile. NPC grows anxious and irritable well before the deadline.\n' +
+                    'Assign based on the NPC\'s established personality in the narrative. Default: 1.0.'
             };
         }
 
         unregisterFunctionTool('LogQuest');
         registerFunctionTool({
             name: 'LogQuest',
-            description: 'Log a new quest when the player formally accepts it from an NPC. Use this ONLY upon acceptance.',
+            description: toolDescription,
             parameters: {
                 type: 'object',
                 properties: properties,
