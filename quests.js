@@ -117,17 +117,22 @@ export function renderQuestsAsPlainText(quests, currentTime) {
     let text = "### ACTIVE QUESTS\n";
     for (const q of activeQuests) {
         text += `- **${q.title}** (Given by ${q.giver_name} at ${q.giver_location})\n`;
-        if (q.deadline_time) {
-            const frust = computeFrustration(q, currentTime);
-            let moodLabel;
-            if (frust <= -0.5)       moodLabel = 'Very Pleased — NPC is optimistic you will make it';
-            else if (frust <= -0.1)  moodLabel = 'Pleased — ahead of schedule';
-            else if (frust <=  0.1)  moodLabel = 'Neutral — on track';
-            else if (frust <=  0.5)  moodLabel = 'Mildly Frustrated — running behind';
-            else if (frust <=  1.0)  moodLabel = 'Frustrated — deadline is near or passed';
-            else if (frust <=  1.5)  moodLabel = 'Very Frustrated — deadline passed long ago';
-            else                      moodLabel = 'Furious — NPC may withdraw the quest entirely';
-            text += `  Deadline: ${q.deadline_time} (NPC Mood: ${moodLabel})\n`;
+        const settings = getSettings();
+        if (q.deadline_time && settings.isDeadlines) {
+            let moodInfo = '';
+            if (settings.isFrustration) {
+                const frust = computeFrustration(q, currentTime);
+                let moodLabel;
+                if (frust <= -0.5)       moodLabel = 'Very Pleased — NPC is optimistic you will make it';
+                else if (frust <= -0.1)  moodLabel = 'Pleased — ahead of schedule';
+                else if (frust <=  0.1)  moodLabel = 'Neutral — on track';
+                else if (frust <=  0.5)  moodLabel = 'Mildly Frustrated — running behind';
+                else if (frust <=  1.0)  moodLabel = 'Frustrated — deadline is near or passed';
+                else if (frust <=  1.5)  moodLabel = 'Very Frustrated — deadline passed long ago';
+                else                      moodLabel = 'Furious — NPC may withdraw the quest entirely';
+                moodInfo = ` (NPC Mood: ${moodLabel})`;
+            }
+            text += `  Deadline: ${q.deadline_time}${moodInfo}\n`;
         }
         for (const obj of q.objectives) {
             if (obj.status !== 'completed') {

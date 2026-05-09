@@ -938,13 +938,21 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
             `<span class="rt-quest-reward">${escapeHtml(r)}</span>`
         ).join('');
 
-        const deadlineRow = quest.deadline_time ? `
+        const settings = getSettings();
+        const showFrustration = settings.isFrustration;
+
+        const moodLabelHtml = showFrustration 
+            ? `<span class="rt-quest-mood-label" style="color:${frustBarColor};">${moodLabel}</span>` 
+            : '';
+        const moodBarFinalHtml = showFrustration ? moodBarHtml : '';
+
+        const deadlineRow = (quest.deadline_time && settings.isDeadlines) ? `
             <div class="rt-quest-deadline">
                 <div class="rt-quest-deadline-header">
                     <span class="rt-entity-sub-label">Deadline:</span> ${escapeHtml(quest.deadline_time)}
-                    <span class="rt-quest-mood-label" style="color:${frustBarColor};">${moodLabel}</span>
+                    ${moodLabelHtml}
                 </div>
-                ${moodBarHtml}
+                ${moodBarFinalHtml}
             </div>` : '';
 
         return `<div class="rt-quest-card${quest.status !== 'active' ? ' rt-quest-inactive' : ''}">
