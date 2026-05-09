@@ -3148,11 +3148,11 @@ Rules:
             registerDiceSlashCommand();
 
             // ─── Quest System ───
-            import('./quests.js').then(({ registerLogQuestTool, installQuestDebugTools, computeFrustration }) => {
+            import('./quests.js').then(({ registerLogQuestTool, installQuestDebugTools, computeFrustration, getQuestMood }) => {
                 registerLogQuestTool();
                 installQuestDebugTools();
-                // Expose computeFrustration for renderQuestLog (renderer can't import dynamically)
-                globalThis.__rpgQuestUtils = { computeFrustration };
+                // Expose for renderQuestLog (renderer can't import dynamically)
+                globalThis.__rpgQuestUtils = { computeFrustration, getQuestMood };
             }).catch(e => console.error('[RPG Tracker] quests.js failed to load:', e));
 
             // Connection Settings

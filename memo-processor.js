@@ -11,6 +11,7 @@
 
 import { getSettings } from './state-manager.js';
 import { DEFAULT_STOCK_PROMPTS } from './constants.js';
+import { getQuestMood } from './quests.js';
 
 // ── String utilities ──────────────────────────────────────────────────────────
 
@@ -450,6 +451,15 @@ export function serializeQuestsToText(quests) {
         if (q.deadline_time)          lines.push(`  DEADLINE: ${q.deadline_time}`);
         if (q.frustration_coefficient != null)
                                       lines.push(`  FRUSTRATION_COEFF: ${q.frustration_coefficient}`);
+
+        // Inject human-readable mood for the AI narrator
+        if (q.status === 'active' || q.status === 'past deadline') {
+            const settings = getSettings();
+            const showFrustration = !!settings.syspromptModules?.questsFrustration;
+            const currentTime = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i)?.[1]?.trim() || "";
+            const { label } = getQuestMood(q, currentTime, showFrustration);
+            lines.push(`  MOOD: ${label}`);
+        }
         for (const obj of (q.objectives || [])) {
             let tag = 'OBJ_ACTIVE';
             if (obj.status === 'completed') tag = 'OBJ_COMPLETED';

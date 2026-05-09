@@ -876,8 +876,14 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
 
     const cards = allQuests.map(quest => {
 
-        const { computeFrustration } = /** @type {any} */ (globalThis.__rpgQuestUtils || {});
-        const frust = typeof computeFrustration === 'function' ? computeFrustration(quest, currentTime) : 0;
+        const { getQuestMood } = /** @type {any} */ (globalThis.__rpgQuestUtils || {});
+        const moodData = typeof getQuestMood === 'function' 
+            ? getQuestMood(quest, currentTime, showFrustration) 
+            : { label: 'Active', color: '#00cc77', value: 0 };
+
+        const frust = moodData.value;
+        const label = moodData.label;
+        const barColor = moodData.color;
 
         // frust: -1 = very pleased/just accepted, 0 = neutral/halfway, 1 = frustrated at deadline, >1 = overdue
         // Map to a centered display: 50% = neutral, 0% = very pleased, 100% = max frustrated
@@ -885,25 +891,6 @@ export function renderQuestLog(quests, currentTime, collapsed, detached, filterT
         const displayFrust = Math.max(-1, Math.min(2, frust));
         const scale        = 100 / 3; // -1→0%, 0→33%, 1→67%, 2→100%
         const fillPct      = Math.round((displayFrust + 1) * scale);
-
-        let barColor = '#00cc77'; // green = pleased
-        let label = 'Pleased';
-        
-        if (showFrustration) {
-            if (frust <= -0.5) { barColor = '#00cc77';  label = 'Very Pleased'; }
-            else if (frust <= -0.1) { barColor = '#44dd88'; label = 'Pleased'; }
-            else if (frust <=  0.1) { barColor = '#aaaaaa'; label = 'Neutral'; }
-            else if (frust <=  0.5) { barColor = '#ffcc00'; label = 'Mildly Frustrated'; }
-            else if (frust <=  1.0) { barColor = '#ff8800'; label = 'Frustrated'; }
-            else if (frust <=  1.5) { barColor = '#ff4400'; label = 'Very Frustrated'; }
-            else                    { barColor = '#ff1111'; label = 'Furious'; }
-        } else {
-            // Deadline only color scheme
-            if (frust <= 0) { barColor = '#00cc77'; label = 'Ahead of Schedule'; }
-            else if (frust <= 0.5) { barColor = '#ffcc00'; label = 'On Time'; }
-            else if (frust <= 1.0) { barColor = '#ff8800'; label = 'Near Deadline'; }
-            else { barColor = '#ff1111'; label = 'Overdue'; }
-        }
 
         const barTitle = showFrustration 
             ? `NPC Mood: ${label} (${frust >= 0 ? '+' : ''}${frust.toFixed(2)})`

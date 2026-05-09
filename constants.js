@@ -105,6 +105,7 @@ QUEST: The Missing Sheep
   ACCEPTED: 08:00 AM, Day 1
   DEADLINE: 06:00 PM, Day 4
   FRUSTRATION_COEFF: 1.2
+  MOOD: Pleased
   OBJ_ACTIVE: Find the missing sheep
   OBJ_ACTIVE: Collect 6 Phosphor-Cap mushrooms [4/6]
   OBJ_TOTAL: 6
@@ -113,11 +114,12 @@ QUEST: The Missing Sheep
 - Use OBJ_ACTIVE / OBJ_COMPLETED / OBJ_FAILED markers. 
 - Append ' (optional)' only if the task is not required.
 - For collection/count objectives, append [current/total] after the text (e.g. [4/6]) and add an OBJ_TOTAL line with the total. Update the count each turn as progress is made.
+- The MOOD field is calculated by the engine based on time pressure and the frustration coefficient. Use this to guide how the NPC speaks and acts.
 - Never delete old quests. Keep completed/failed ones with updated STATUS.
 - If no quests exist yet, emit [QUESTS][/QUESTS] (empty).`,
 };
 
-export const QUESTS_NARRATOR_MODERN = `When the player formally accepts a quest or task from an NPC, you MUST call the LogQuest tool. If a duration is given (e.g., 'four days'), you MUST calculate the specific "Day N" timestamp based on the current in-world time. After LogQuest finishes, output *[QUEST ACCEPTED]*. Do NOT do this for rumors, casual mentions, or tasks the player has not yet agreed to.`;
+export const QUESTS_NARRATOR_MODERN = `When the player formally accepts a quest or task from an NPC, you MUST call the LogQuest tool. If a duration is given (e.g., 'four days'), you MUST calculate the specific "Day N" timestamp based on the current in-world time. After LogQuest finishes, output *[QUEST ACCEPTED]*. Do NOT do this for rumors, casual mentions, or tasks the player has not yet agreed to. Use the MOOD field in the [QUESTS] block to guide how NPCs react to the player's progress or lack thereof.`;
 
 export const QUESTS_NARRATOR_LEGACY = `When the player formally accepts a quest from an NPC, describe it clearly in the narrative and conclude with the tag [QUEST ACCEPTED]. State who gave the quest, where they are located, what the task entails, any time pressure, and what rewards were promised. Do NOT do this for rumors, casual requests, or tasks the player has not yet agreed to.\n\nWhen an objective is completed, mention it naturally in the narrative. When a quest concludes (success or failure), narrate the outcome.`;
 
