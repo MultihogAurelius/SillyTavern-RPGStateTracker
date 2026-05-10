@@ -2,6 +2,14 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.8.11] - 2026-05-10
+
+**Lorebook Synchronization & Robust Loading**
+This update resolves a race condition where lorebooks would fail to populate in the extension settings.
+
+### Fixed
+- **Lorebook Initialization Race Condition**: Implemented a 3-tier fallback for loading world info names. If the in-memory list is empty, the extension now forces a backend refresh and retries, with a final direct API fetch fallback. This ensures lorebooks are always accessible regardless of SillyTavern's initialization timing.
+
 ## [1.8.10] - 2026-05-10
 
 **Quest Framework Refinements & Progress Tracking**  
