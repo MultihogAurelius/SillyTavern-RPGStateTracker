@@ -100,22 +100,25 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 1. grep_lore(query): Search all lorebooks in scope ("${prefix || 'All'}") for keywords.
 2. inspect_book(book_name): List entries in a specific book.
 3. read_entry(uid): Read the full content of an archive entry.
-4. commit(activate, deactivate, record, update): Final action. Ends loop.
-   - activate/deactivate: ["Book::UID", ...]
+4. commit(activate, deactivate, record, update, delete_ids): Final action. Ends loop.
+   - activate/deactivate: ["Book::UID", ...] (Toggles presence in active context)
    - record: [{"label": "Title/Name", "keys": ["keyword1", ...], "content": "Description", "category": "NPC/LOC/QUEST"}]
    - update: [{"id": "Book::UID", "content": "Full new content"}]
+   - delete_ids: ["Book::UID", ...] (Permanently REMOVES from lorebook)
 
 ## PROCESS
-Use Thought/Action/Observation. You can call "commit" multiple times to save changes in batches. Your turn ends when you provide a "Thought" without an "Action".
+1. **SEARCH FIRST**: Always use \`grep_lore\` or \`inspect_book\` before recording a new entry to prevent duplicates.
+2. **CONSOLIDATE**: If you find duplicates, use \`delete_ids\` to remove the redundant ones and \`update\` the primary one with the combined info.
+3. Use Thought/Action/Observation. You can call "commit" multiple times. Your turn ends when you provide a "Thought" without an "Action".
 
 ## EXAMPLE
-Thought: The user mentioned a new character, Elara. I need to see if she exists.
+Thought: The user mentioned Elara. I will check if she exists.
 Action: grep_lore("Elara")
-Observation: No matches found.
-Thought: She is new. I will record her and activate the current location.
-Action: commit({"record":[{"label":"NPC: Elara","keys":["Elara","Mage"],"content":"A mysterious mage.","category":"NPC"}], "activate":["Locations::12"]})
+Observation: Found "Adventure_NPCs::0" (Elara).
+Thought: She already exists. I will update her description and activate her.
+Action: commit({"update":[{"id":"Adventure_NPCs::0","content":"Now a known ally."}], "activate":["Adventure_NPCs::0"]})
 Observation: Committed successfully.
-Thought: I have recorded Elara. Research complete.
+Thought: I have updated Elara. Research complete.
 
 ## SCOPE
 Campaign Root: "${prefix || 'None'}" (All records go here. NPCs/Locations may be sorted into "${prefix ? prefix + '_NPCs' : 'NPCs'}" or "${prefix ? prefix + '_Locations' : 'Locations'}").
@@ -269,6 +272,22 @@ async function applyAction(action) {
         changed = true;
     }
 
+    // 4. Delete
+    const deleteIds = action.delete_ids || [];
+    for (const id of deleteIds) {
+        const parts = id.split('::');
+        if (parts.length < 2) continue;
+        const [bookName, uid] = parts;
+        const book = await ctx.loadWorldInfo(bookName);
+        if (book?.entries?.[uid]) {
+            delete book.entries[uid];
+            await ctx.saveWorldInfo(bookName, book);
+            // Also remove from active keys if present
+            settings.activeRouterKeys = settings.activeRouterKeys.filter(k => k !== id);
+            changed = true;
+        }
+    }
+
     if (changed) {
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         settings.routerLog.unshift({
@@ -276,6 +295,7 @@ async function applyAction(action) {
             activate: activate,
             deactivate: deactivate,
             record: records.map(r => r.label || r.id),
+            delete: deleteIds,
             reason: action.reason || "Manual update."
         });
         if (settings.routerLog.length > 50) settings.routerLog.length = 50;

@@ -2052,7 +2052,8 @@ Rules:
                 let diffStr = '';
                 if (entry.activate?.length) diffStr += `<span style="color:#55ff55;">+${entry.activate.length}</span> `;
                 if (entry.deactivate?.length) diffStr += `<span style="color:#ff5555;">-${entry.deactivate.length}</span> `;
-                if (entry.record?.length) diffStr += `<span style="color:#55ccff;">*${entry.record.length}</span> `;
+                if (entry.record?.length) diffStr += `<span style="color:#55ccff;" title="Created: ${entry.record.join(', ')}">*${entry.record.length}</span> `;
+                if (entry.delete?.length) diffStr += `<span style="color:#ff3333; font-weight: bold;" title="Deleted: ${entry.delete.join(', ')}">✕${entry.delete.length}</span> `;
                 return `<div style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px; font-size: 10px; margin-bottom: 4px; border-left: 2px solid rgba(255,255,255,0.05);">
                     <div style="display:flex; justify-content: space-between; opacity: 0.7; margin-bottom: 2px; font-weight: bold;">
                         <span>${entry.time}</span>
