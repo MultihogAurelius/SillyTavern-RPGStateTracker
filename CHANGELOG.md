@@ -2,6 +2,16 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [1.8.22] - 2026-05-10
+
+**Fix: Mood Sync Logic**
+Synchronized the visual mood indicator with the explicit `MOOD` field in the quest tracker.
+
+### Fixed
+- **Mood Prioritization**: The UI now prioritizes the explicit `MOOD` field provided by the AI narrator over the calculated frustration.
+- **Deadline-Free Frustration**: Quests without deadlines (`DEADLINE: None`) now correctly default to a "Very Pleased" state (`-1.0`) instead of "Neutral" (`0`).
+- **Parsing Robustness**: Added `MOOD` field parsing to the legacy quest block processor to ensure AI-specified emotional states are preserved across state updates.
+
 ## [1.8.21] - 2026-05-10
 
 **Enhancement: RNG Queue Guidance**

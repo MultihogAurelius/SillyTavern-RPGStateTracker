@@ -22,7 +22,7 @@ import { DEFAULT_STOCK_PROMPTS } from './constants.js';
  * @returns {number}
  */
 function computeFrustrationLocal(quest, currentTime) {
-    if (!quest.deadline_time || !quest.accepted_time) return 0;
+    if (!quest.deadline_time || !quest.accepted_time || quest.deadline_time.toLowerCase() === 'none') return -1;
     const coeff = (quest.frustration_coefficient != null) ? quest.frustration_coefficient : 1.0;
     const acceptedMins  = parseInWorldTime(quest.accepted_time);
     const deadlineMins  = parseInWorldTime(quest.deadline_time);
@@ -49,6 +49,8 @@ export function getQuestMood(quest, currentTime, showFrustration) {
     const frust = computeFrustrationLocal(quest, currentTime);
     let color = '#00cc77';
     let label = 'Pleased';
+    
+    // 1. Calculate base mood from frustration
     if (showFrustration) {
         if (frust <= -0.5)      { color = '#00cc77'; label = 'Very Pleased'; }
         else if (frust <= -0.1) { color = '#44dd88'; label = 'Pleased'; }
@@ -63,6 +65,20 @@ export function getQuestMood(quest, currentTime, showFrustration) {
         else if (frust <= 1.0)  { color = '#ff8800'; label = 'Near Deadline'; }
         else                    { color = '#ff1111'; label = 'Overdue'; }
     }
+
+    // 2. Override with explicit mood if provided (AI Narrator's source of truth)
+    if (quest.mood && showFrustration) {
+        const m = String(quest.mood).toLowerCase();
+        label = quest.mood; // Keep original casing for display
+        if (m.includes('very pleased')) color = '#00cc77';
+        else if (m.includes('pleased')) color = '#44dd88';
+        else if (m.includes('neutral')) color = '#aaaaaa';
+        else if (m.includes('mildly frustrated')) color = '#ffcc00';
+        else if (m.includes('very frustrated')) color = '#ff4400';
+        else if (m.includes('frustrated')) color = '#ff8800';
+        else if (m.includes('furious') || m.includes('angry')) color = '#ff1111';
+    }
+
     return { label, color, value: frust };
 }
 
@@ -477,6 +493,7 @@ export function parseQuestsFromText(text) {
             accepted_time:          getField('ACCEPTED'),
             deadline_time:          getField('DEADLINE'),
             difficulty:             getField('DIFFICULTY'),
+            mood:                   getField('MOOD'),
             frustration_coefficient: coeff !== null && !isNaN(coeff) ? coeff : undefined,
             objectives,
             rewards,
