@@ -2028,9 +2028,6 @@
     margin-bottom: 8px;
 }
 
-.rpg-tracker-settings .inline-drawer.open {
-    /* No height override — let slideToggle handle it */
-}
 
 .rpg-tracker-settings .inline-drawer .inline-drawer {
     margin-left: 12px;
