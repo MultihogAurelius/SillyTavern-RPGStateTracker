@@ -2815,10 +2815,10 @@ Rules:
         }
 
         const updateRouterPanels = () => {
-                const src = sourceSel.value;
-                if (profGrp) profGrp.style.display = src === 'profile' ? 'block' : 'none';
-                if (ollGrp) ollGrp.style.display = src === 'ollama' ? 'block' : 'none';
-                if (oaiGrp) oaiGrp.style.display = src === 'openai' ? 'block' : 'none';
+            const src = sourceSel.value;
+                $(profGrp).stop(true, true)[src === 'profile' ? 'slideDown' : 'slideUp'](200);
+                $(ollGrp).stop(true, true)[src === 'ollama' ? 'slideDown' : 'slideUp'](200);
+                $(oaiGrp).stop(true, true)[src === 'openai' ? 'slideDown' : 'slideUp'](200);
             };
 
             if (sourceSel) {
