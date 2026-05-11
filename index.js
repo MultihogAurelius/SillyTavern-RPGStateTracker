@@ -160,10 +160,11 @@ import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './route
         
         if (saved.activeRouterKeys) s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys));
         if (saved.routerLog) s.routerLog = JSON.parse(JSON.stringify(saved.routerLog));
-        s.routerCampaignPrefix = saved.routerCampaignPrefix ?? '';
-
-        const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
-        if (prefixInput) prefixInput.value = s.routerCampaignPrefix;
+        if (saved.routerCampaignPrefix !== undefined) {
+            s.routerCampaignPrefix = saved.routerCampaignPrefix;
+            const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
+            if (prefixInput) prefixInput.value = s.routerCampaignPrefix;
+        }
 
         _historyViewIndex = -1;
         
@@ -291,11 +292,7 @@ import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './route
             s.lastDelta    = '';
             s.activeRouterKeys = [];
             s.routerLog    = [];
-            s.routerCampaignPrefix = '';
             
-            const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
-            if (prefixInput) prefixInput.value = '';
-
             _historyViewIndex = -1;
 
             const dp = document.getElementById('rpg-tracker-delta-content');
