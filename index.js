@@ -175,6 +175,12 @@ import { runRouterPass, getLorebookManifest, deleteLorebookEntry } from './route
 
         refreshOrderList();
         syncMemoView();
+        
+        // Refresh Lorebook Agent UI
+        if (typeof renderRouterUI === 'function') {
+            renderRouterUI();
+        }
+        
         return true;
     }
 
@@ -2233,15 +2239,21 @@ Rules:
                     const saved = s.chatStates?.[_currentChatId];
                     const liveContent = (s.currentMemo || '').trim();
                     const savedContent = (saved?.currentMemo || '').trim();
+                    
+                    const liveKeys = s.activeRouterKeys || [];
+                    const savedKeys = saved?.activeRouterKeys || [];
+                    const keysChanged = JSON.stringify(liveKeys.sort()) !== JSON.stringify(savedKeys.sort());
 
-                    // Only show conflict if BOTH have content and they are DIFFERENT
-                    if (savedContent && liveContent && liveContent !== savedContent) {
+                    // Show conflict if EITHER content or keys are different
+                    const hasConflict = (savedContent && liveContent && liveContent !== savedContent) || (savedKeys.length > 0 && liveKeys.length > 0 && keysChanged);
+
+                    if (hasConflict) {
                         const body = `
                             <div style="text-align: left;">
-                                <p><b>Conflict Detected:</b> This chat has a saved tracker state, but your current (Global) tracker is not empty.</p>
+                                <p><b>Conflict Detected:</b> This chat has a saved state (memo or lore keys), but your current session is not empty.</p>
                                 <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">
-                                    <b>RESTORE:</b> Use the chat's saved state. (Global work is moved to history)<br>
-                                    <b>OVERWRITE:</b> Keep current work and save it to this chat. (Old chat data is moved to history)
+                                    <b>RESTORE:</b> Use the chat's saved state. (Current session moved to history)<br>
+                                    <b>OVERWRITE:</b> Keep current session and save it to this chat. (Old chat data moved to history)
                                 </p>
                             </div>`;
                         
