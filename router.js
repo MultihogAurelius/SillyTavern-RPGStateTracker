@@ -429,25 +429,36 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     const recordedIds = [];
     for (const rec of records) {
         // Map category to book name
+        const allBookNames = Object.keys(allBooks);
         const baseBook = prefix || 'World Chronicle';
         let targetBook = baseBook;
         const cat = (rec.category || rec.comment || '').toUpperCase();
         
-        if (cat.includes('NPC')) targetBook = prefix ? `${prefix}_NPCs` : 'NPCs';
-        else if (cat.includes('LOC')) targetBook = prefix ? `${prefix}_Locations` : 'Locations';
-        else if (cat.includes('QUEST')) targetBook = prefix ? `${prefix}_Quests` : 'Quests';
-        else if (cat.includes('FAC')) targetBook = prefix ? `${prefix}_Factions` : 'Factions';
-        else if (cat.includes('EVENT')) targetBook = prefix ? `${prefix}_Events` : 'Events';
+        const catMap = { 'NPC': 'NPCs', 'LOC': 'Locations', 'QUEST': 'Quests', 'FAC': 'Factions', 'EVENT': 'Events' };
+        const catName = Object.keys(catMap).find(k => cat.includes(k));
+        const targetCat = catName ? catMap[catName] : null;
+
+        if (targetCat) {
+            const prefixed = prefix ? `${prefix}_${targetCat}` : targetCat;
+            if (allBooks[prefixed]) {
+                targetBook = prefixed;
+            } else if (allBooks[targetCat]) {
+                targetBook = targetCat;
+            } else if (allBooks[baseBook]) {
+                targetBook = baseBook;
+            } else {
+                targetBook = allBookNames[0] || baseBook;
+            }
+        } else {
+            targetBook = allBooks[baseBook] ? baseBook : (allBookNames[0] || baseBook);
+        }
+
+        if (settings.debugMode) console.log(`[RPG Tracker] Recording ${cat} "${rec.label}" into book: ${targetBook}`);
 
         // Fallback: If the specific book doesn't exist, use the base book or first available
         if (!allBooks[targetBook]) {
-            if (allBooks[baseBook]) {
-                targetBook = baseBook;
-            } else {
-                // Last resort: pick the first available book in scope
-                const firstAvailable = Object.keys(allBooks)[0];
-                if (firstAvailable) targetBook = firstAvailable;
-            }
+            const fallback = allBookNames.find(n => n.includes(targetBook) || n.includes(prefix)) || allBookNames[0];
+            if (fallback) targetBook = fallback;
         }
 
         if (cat.includes('EVENT')) {
