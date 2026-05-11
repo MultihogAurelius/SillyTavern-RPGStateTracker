@@ -97,6 +97,18 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             return `${name}: ${content.replace(/<[^>]+>/g, '')}`;
         }).join('\n\n');
 
+        // Extract Current Context (Time & Location)
+        const timeRegex = /([0-9]{1,2}:[0-9]{2}\s*[AP]M,\s*Day\s*[0-9]+)/i;
+        const narrativeTimeMatch = recentChat.match(timeRegex);
+        const memoTimeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+        const cleanMemoTime = memoTimeMatch ? memoTimeMatch[1].split('\n')[0].trim() : '';
+        const currentTime = narrativeTimeMatch ? narrativeTimeMatch[1] : cleanMemoTime;
+
+        const locationRegex = /\(Location:\s*([^)]+)\)/i;
+        const locMatch = recentChat.match(locationRegex);
+        const currentHierarchy = locMatch ? locMatch[1].trim() : '';
+        const breadcrumb = currentHierarchy ? currentHierarchy.replace(/,\s*/g, ' :: ') : '';
+
         // 2. The Loop
         let turns = 0;
         const maxTurns = settings.routerMaxTurns || 5;
@@ -156,16 +168,6 @@ ${(settings.routerCustomTags || []).map(m => `- ${m.tag}: ${m.instruction}`).joi
 
         while (turns < maxTurns) {
             turns++;
-            const timeRegex = /([0-9]{1,2}:[0-9]{2}\s*[AP]M,\s*Day\s*[0-9]+)/i;
-            const narrativeTimeMatch = recentChat.match(timeRegex);
-            const memoTimeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
-            const cleanMemoTime = memoTimeMatch ? memoTimeMatch[1].split('\n')[0].trim() : '';
-            const currentTime = narrativeTimeMatch ? narrativeTimeMatch[1] : cleanMemoTime;
-
-            const locationRegex = /\(Location:\s*([^)]+)\)/i;
-            const locMatch = recentChat.match(locationRegex);
-            const currentHierarchy = locMatch ? locMatch[1].trim() : '';
-            const breadcrumb = currentHierarchy ? currentHierarchy.replace(/,\s*/g, ' :: ') : '';
             
             const questMatch = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
             const questBlock = questMatch ? `[QUESTS]${questMatch[1].trim()}[/QUESTS]` : 'None';
