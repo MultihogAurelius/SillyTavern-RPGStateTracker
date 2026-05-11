@@ -46,7 +46,7 @@ function buildKeyringText(allBooks) {
 /**
  * The core Researcher Agent loop.
  */
-export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null, stateUpdate = null) {
+export async function runRouterPass(narrativeOutput, manualPrompt = null, customLookback = null) {
     const settings = getSettings();
     if (!settings.routerEnabled || _routerRunning) return;
 
@@ -153,7 +153,10 @@ ${(settings.routerCustomTags || []).map(m => `- ${m.tag}: ${m.instruction}`).joi
             const timeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
             const worldTime = timeMatch ? `[TIME]${timeMatch[1].trim()}[/TIME]` : 'Unknown';
             
-            const userPrompt = `## WORLD CLOCK\n${worldTime}\n\n${stateUpdate ? `## MECHANICAL CHANGES\n${stateUpdate}\n\n` : ''}## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
+            const questMatch = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+            const questBlock = questMatch ? `[QUESTS]${questMatch[1].trim()}[/QUESTS]` : 'None';
+            
+            const userPrompt = `## WORLD CLOCK\n${worldTime}\n\n## ACTIVE QUESTS\n${questBlock}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
 
             const routerSettings = {
                 ...settings,

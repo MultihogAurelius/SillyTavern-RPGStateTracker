@@ -349,10 +349,9 @@ export async function onGenerationEnded() {
 
     if (settings.debugMode) console.log("[RPG Tracker] Assistant generation ended. Triggering State Model pass...", combinedNarrative);
 
-    let stateUpdateSummary = null;
     if (typeof globalThis._rpgRunStateModelPass === 'function') {
-        stateUpdateSummary = await globalThis._rpgRunStateModelPass(combinedNarrative);
+        await globalThis._rpgRunStateModelPass(combinedNarrative);
     }
     
-    await runRouterPass(combinedNarrative, null, -1, stateUpdateSummary);
+    await runRouterPass(combinedNarrative);
 }
