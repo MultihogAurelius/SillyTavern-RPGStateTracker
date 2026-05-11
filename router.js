@@ -298,7 +298,10 @@ async function applyAction(action) {
     const deactivate = action.deactivate || [];
     let newActive = [...(settings.activeRouterKeys || [])];
     
+    // Remove deactivations
     newActive = newActive.filter(k => !deactivate.includes(k));
+    
+    // Add activations
     for (const k of activate) {
         if (!newActive.includes(k)) {
             newActive.push(k);
@@ -306,7 +309,6 @@ async function applyAction(action) {
         }
     }
     if (deactivate.length > 0) changed = true;
-    settings.activeRouterKeys = newActive;
 
     // 2. Update existing
     const updates = action.update || [];
@@ -334,11 +336,21 @@ async function applyAction(action) {
         else if (cat.includes('EVENT')) targetBook = prefix ? `${prefix}_Events` : 'Events';
 
         const newId = await addLorebookEntry(targetBook, rec);
-        if (!settings.activeRouterKeys.includes(newId)) {
-            settings.activeRouterKeys.push(newId);
+        if (!newActive.includes(newId)) {
+            newActive.push(newId);
         }
         changed = true;
     }
+
+    // 4. Enforce Max Activations (FIFO Pruning)
+    const maxActive = settings.routerMaxActivations || 5;
+    if (newActive.length > maxActive) {
+        const countBefore = newActive.length;
+        newActive = newActive.slice(newActive.length - maxActive);
+        if (newActive.length !== countBefore) changed = true;
+    }
+    
+    settings.activeRouterKeys = newActive;
 
     // 4. Delete
     const deleteIds = action.delete_ids || [];

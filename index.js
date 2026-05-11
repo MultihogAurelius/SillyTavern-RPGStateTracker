@@ -2514,12 +2514,15 @@ Rules:
                 list.innerHTML = '';
                 Object.entries(s.routerModules || {}).forEach(([id, config]) => {
                     const row = document.createElement('div');
-                    row.style.cssText = 'display: flex; gap: 4px; margin-bottom: 4px; align-items: center;';
+                    row.style.cssText = 'display: flex; gap: 4px; margin-bottom: 6px; align-items: center;';
                     row.innerHTML = `
-                        <input type="checkbox" class="rt-agent-module-check" data-id="${id}" ${config.enabled ? 'checked' : ''} style="cursor: pointer;">
-                        <div style="flex: 1;">
-                            <div style="font-size: 10px; font-weight: bold; opacity: 0.7;">${config.tag}</div>
-                            <input type="text" value="${config.instruction}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
+                        <input type="checkbox" class="rt-agent-module-check" data-id="${id}" ${config.enabled ? 'checked' : ''} style="cursor: pointer; margin: 0;">
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 10px; font-weight: bold; opacity: 0.7;">${config.tag}</div>
+                                <button class="rt-agent-module-reset" data-id="${id}" style="background: transparent; border: none; color: var(--rt-accent); cursor: pointer; font-size: 10px; padding: 0 4px; opacity: 0.6; height: 14px;" title="Reset to Default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                            </div>
+                            <input type="text" value="${config.instruction}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--rt-text); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 10px; padding: 2px 4px; box-sizing: border-box;">
                         </div>
                     `;
                     list.appendChild(row);
@@ -2541,6 +2544,27 @@ Rules:
                         const s = getSettings();
                         s.routerModules[id].instruction = target.value;
                         saveSettings();
+                    });
+                });
+                list.querySelectorAll('.rt-agent-module-reset').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const id = (/** @type {HTMLElement} */ (e.currentTarget)).dataset.id;
+                        if (confirm(`Reset ${id.toUpperCase()} module instructions to default?`)) {
+                            const s = getSettings();
+                            // Default values from state-manager.js logic
+                            const defaults = {
+                                npc: 'Use for NEW NPCs or updating ACTIVE ones.',
+                                loc: 'Use for NEW Locations. ALWAYS specify the Parent Location (e.g., City if it is a building, Region if it is a city).',
+                                fac: 'Track faction reputation and standing.',
+                                quest: 'Record quests and where they were received.',
+                                event: 'Record significant narrative events. ALWAYS include a timestamp (e.g., [Day 1, 14:00]) in the details so the chronology is preserved.'
+                            };
+                            if (defaults[id]) {
+                                s.routerModules[id].instruction = defaults[id];
+                                saveSettings();
+                                renderAgentModules();
+                            }
+                        }
                     });
                 });
             };
