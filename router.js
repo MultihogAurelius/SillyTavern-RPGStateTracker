@@ -396,7 +396,14 @@ async function applyAction(action, allBooks = {}) {
         else if (cat.includes('LOC')) targetBook = prefix ? `${prefix}_Locations` : 'Locations';
         else if (cat.includes('QUEST')) targetBook = prefix ? `${prefix}_Quests` : 'Quests';
         else if (cat.includes('FAC')) targetBook = prefix ? `${prefix}_Factions` : 'Factions';
-        else if (cat.includes('EVENT')) targetBook = prefix ? `${prefix}_Events` : 'Events';
+        else if (cat.includes('EVENT')) {
+            targetBook = prefix ? `${prefix}_Events` : 'Events';
+            const timeMatch = settings.currentMemo?.match(/\[TIME\]([\s\S]*?)\[\/TIME\]/i);
+            const currentTime = timeMatch ? timeMatch[1].trim() : '';
+            if (currentTime && !rec.label.includes('[Day')) {
+                rec.label = `[${currentTime}] ${rec.label}`;
+            }
+        }
 
         // DEDUPLICATION: Check if an entry with this label already exists in the target book
         let existingUid = null;
