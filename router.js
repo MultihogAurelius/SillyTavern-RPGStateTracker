@@ -440,26 +440,13 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
         if (targetCat) {
             const prefixed = prefix ? `${prefix}_${targetCat}` : targetCat;
-            if (allBooks[prefixed]) {
-                targetBook = prefixed;
-            } else if (allBooks[targetCat]) {
-                targetBook = targetCat;
-            } else if (allBooks[baseBook]) {
-                targetBook = baseBook;
-            } else {
-                targetBook = allBookNames[0] || baseBook;
-            }
+            // Always prefer the category-specific name (will be created if missing)
+            targetBook = prefixed;
         } else {
-            targetBook = allBooks[baseBook] ? baseBook : (allBookNames[0] || baseBook);
+            targetBook = baseBook;
         }
 
-        if (settings.debugMode) console.log(`[RPG Tracker] Recording ${cat} "${rec.label}" into book: ${targetBook}`);
-
-        // Fallback: If the specific book doesn't exist, use the base book or first available
-        if (!allBooks[targetBook]) {
-            const fallback = allBookNames.find(n => n.includes(targetBook) || n.includes(prefix)) || allBookNames[0];
-            if (fallback) targetBook = fallback;
-        }
+        if (settings.debugMode) console.log(`[RPG Tracker] Routing ${cat} "${rec.label}" to: ${targetBook}`);
 
         if (cat.includes('EVENT')) {
             if (currentTime && !rec.label.includes('[Day')) {
@@ -651,7 +638,15 @@ async function addLorebookEntry(lorebookName, entryData, allNames) {
     if (allNames.includes(lorebookName)) {
         bookData = await ctx.loadWorldInfo(lorebookName);
     } else {
-        bookData = { entries: {} };
+        if (getSettings().debugMode) console.log(`[RPG Tracker] Initializing new lorebook: ${lorebookName}`);
+        bookData = { 
+            entries: {},
+            name: lorebookName,
+            scan_depth: 4,
+            token_budget: 400,
+            recursive: false,
+            extensions: {}
+        };
     }
 
     const existingUids = Object.keys(bookData.entries).map(Number).filter(n => !isNaN(n));
