@@ -533,6 +533,10 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             console.error(`[RPG Tracker] Failed to save ${targetBook}: HTTP ${saveRes.status}`);
         } else {
             if (settings.debugMode) console.log(`[RPG Tracker] Saved ${recs.length} entries to ${targetBook}`);
+            // Give the backend a moment to flush to disk and the indexer to see it
+            await new Promise(r => setTimeout(r, 200));
+            // Force SillyTavern to refresh its internal list of world info books
+            await ctx.getWorldInfoList();
         }
     }
 
