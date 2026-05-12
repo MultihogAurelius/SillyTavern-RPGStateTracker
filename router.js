@@ -1,4 +1,4 @@
-﻿import { getSettings } from './state-manager.js';
+import { getSettings } from './state-manager.js';
 import { sendStateRequest } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
@@ -627,6 +627,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
 /**
  * Restores a past lorebook snapshot from routerHistory.
+ * - Deletes any lorebook that was CREATED during the pass (wasn't in snapshot).
+ * - Overwrites any lorebook that was MODIFIED during the pass back to its pre-pass content.
  * @param {number} index - 0 = most recent pre-pass snapshot.
  * @returns {Promise<boolean>}
  */
@@ -644,7 +646,44 @@ export async function rollbackRouterPass(index = 0) {
     if (!snapshot) return false;
 
     try {
-        // 1. Restore each lorebook to its snapshotted state
+        const prePassBooks = new Set(Object.keys(snapshot.bookSnapshots || {}));
+        const prefix = settings.routerCampaignPrefix || '';
+
+        // ── Step 1: Delete lorebooks that were CREATED during the pass ────────
+        // Fetch current book list scoped to the campaign prefix (or all if none).
+        const allCurrentNames = await getWorldInfoNamesSafe();
+        const scopedCurrent = prefix
+            ? allCurrentNames.filter(n => n.startsWith(prefix))
+            : allCurrentNames;
+
+        for (const bookName of scopedCurrent) {
+            if (prePassBooks.has(bookName)) continue; // Pre-existed — restore below, don't delete
+            // This book was CREATED during the pass — permanently delete it
+            let deleted = false;
+            try {
+                const delRes = await fetch('/api/worldinfo/delete', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ name: bookName })
+                });
+                deleted = delRes.ok;
+            } catch (_) { /* endpoint may not exist on older ST builds */ }
+
+            if (!deleted) {
+                // Fallback: clear all entries so the book is effectively empty
+                const emptyBook = { entries: {}, name: bookName, scan_depth: 4, token_budget: 400, recursive: false, extensions: {} };
+                await fetch('/api/worldinfo/edit', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ name: bookName, data: emptyBook })
+                });
+                if (typeof ctx.saveWorldInfo === 'function') {
+                    try { await ctx.saveWorldInfo(bookName, emptyBook); } catch (_) {}
+                }
+            }
+        }
+
+        // ── Step 2: Restore pre-pass lorebooks to their snapshotted state ─────
         for (const [bookName, bookData] of Object.entries(snapshot.bookSnapshots || {})) {
             const saveRes = await fetch('/api/worldinfo/edit', {
                 method: 'POST',
@@ -655,16 +694,16 @@ export async function rollbackRouterPass(index = 0) {
                 console.error(`[RPG Tracker] Rollback: failed to restore ${bookName}: HTTP ${saveRes.status}`);
                 continue;
             }
-            // Bust ST in-memory cache
+            // Bust ST in-memory cache so the UI sees the restored data immediately
             if (typeof ctx.saveWorldInfo === 'function') {
                 try { await ctx.saveWorldInfo(bookName, bookData); } catch (_) { /* non-fatal */ }
             }
         }
 
-        // 2. Restore active keys
+        // ── Step 3: Restore active keys ───────────────────────────────────────
         settings.activeRouterKeys = JSON.parse(JSON.stringify(snapshot.activeRouterKeys || []));
 
-        // 3. Trim snapshots newer than the restored point
+        // ── Step 4: Trim snapshots newer than the restored point ──────────────
         settings.routerHistory = history.slice(index + 1);
 
         ctx.saveSettingsDebounced();
