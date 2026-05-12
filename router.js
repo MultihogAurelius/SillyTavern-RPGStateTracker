@@ -159,8 +159,8 @@ Campaign Root: "${prefix || 'World Archive'}"
 Hierarchy: When recording locations or NPCs, use the current breadcrumb (${breadcrumb || 'Root'}) as a prefix in the label using the " :: " separator.
 Example: "Khelt :: Section Four :: Impact Site"
 
-Categories: Always include "In: [Parent]" in the keywords for every ancestor in the hierarchy.
-Example Keywords: "scholarly, In: Khelt, In: Section Four" (Note: do not include the name of the entry itself or parents without the "In:" prefix).
+Categories: For every ancestor in the hierarchy, include its name as a plain keyword.
+Example Keywords: "scholarly, Khelt, Section Four" (Note: do not include the name of the entry itself in its own keywords).
 
 ## FIELD INSTRUCTIONS
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}
