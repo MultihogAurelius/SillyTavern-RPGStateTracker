@@ -1029,8 +1029,18 @@ Rules:
         const indicator = document.getElementById('rpg-tracker-status');
         const pauseBtn = document.getElementById('rpg-tracker-pause-btn');
         const pauseBanner = document.getElementById('rpg-tracker-pause-banner');
+        const enableBtn = /** @type {HTMLElement|null} */ (document.getElementById('rpg-tracker-enable-btn'));
 
         if (!panel || !indicator || !pauseBtn) return;
+
+        // Keep in-panel power button in sync
+        if (enableBtn) {
+            enableBtn.style.opacity = settings.enabled ? '' : '0.35';
+            enableBtn.title = settings.enabled ? 'Disable RPG Tracker' : 'Enable RPG Tracker';
+        }
+        // Keep settings sidebar checkbox in sync
+        const sidebarEnableCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_enabled'));
+        if (sidebarEnableCheck) sidebarEnableCheck.checked = !!settings.enabled;
 
         if (!settings.enabled) {
             // Fully disabled — transparent panel, no banner
@@ -2079,6 +2089,7 @@ Rules:
                 </div>
                 <div class="rpg-tracker-header-center" id="rpg-tracker-pause-banner"></div>
                 <div class="rpg-tracker-header-right">
+                    <button class="rpg-tracker-icon-btn" id="rpg-tracker-enable-btn" title="${settings.enabled ? 'Disable RPG Tracker' : 'Enable RPG Tracker'}" style="${settings.enabled ? '' : 'opacity:0.4;'}" >⏻</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-update-btn" title="Update State Now">🔄</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-pause-btn" title="Pause Tracker">⏸</button>
                     <button class="rpg-tracker-icon-btn" id="rpg-tracker-prompt-btn" title="Toggle direct prompt">💬</button>
@@ -2349,6 +2360,17 @@ Rules:
             });
         }
 
+        const enableBtn = panel.querySelector('#rpg-tracker-enable-btn');
+        if (enableBtn) {
+            enableBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const s = getSettings();
+                s.enabled = !s.enabled;
+                saveSettings();
+                updatePanelStatus();
+            });
+        }
+
         const pauseBtn = panel.querySelector('#rpg-tracker-pause-btn');
         if (pauseBtn) {
             pauseBtn.addEventListener('click', (e) => {
@@ -2591,12 +2613,29 @@ Rules:
                 });
             }
 
+            /** Applies/removes is-agent-disabled on the agent panel to match routerEnabled. */
+            function updateAgentPanelDisabled() {
+                const s = getSettings();
+                if (s.routerEnabled) {
+                    agentPanel.classList.remove('is-agent-disabled');
+                } else {
+                    agentPanel.classList.add('is-agent-disabled');
+                }
+                // Keep settings sidebar toggle in sync
+                const sidebarCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_router_enabled'));
+                if (sidebarCheck) sidebarCheck.checked = !!s.routerEnabled;
+            }
+
+            // Apply on open
+            updateAgentPanelDisabled();
+
             const enableCheck = agentPanel.querySelector('#rt-agent-router-enable');
             if (enableCheck) {
                 enableCheck.addEventListener('change', (e) => {
                     const s = getSettings();
                     s.routerEnabled = (/** @type {HTMLInputElement} */ (e.target)).checked;
                     saveSettings();
+                    updateAgentPanelDisabled();
                 });
             }
 
@@ -5821,7 +5860,15 @@ Rules:
             $('#rpg_tracker_router_enabled').prop('checked', settings.routerEnabled).on('change', function () {
                 settings.routerEnabled = !!$(this).prop('checked');
                 saveSettings();
-                updatePanelStatus();
+                // Sync in-panel enable checkbox
+                const inPanelCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rt-agent-router-enable'));
+                if (inPanelCheck) inPanelCheck.checked = settings.routerEnabled;
+                // Apply disabled state to agent panel
+                const ap = document.getElementById('rpg-tracker-agent');
+                if (ap) {
+                    if (settings.routerEnabled) ap.classList.remove('is-agent-disabled');
+                    else ap.classList.add('is-agent-disabled');
+                }
             });
 
             const routerSourceSelect = $('#rpg_tracker_router_source');

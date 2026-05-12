@@ -252,6 +252,23 @@
     pointer-events: none;
 }
 
+/* Agent panel disabled — dim content but keep header + enable toggle interactive */
+.rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-content {
+    opacity: 0.45;
+    filter: grayscale(0.5) brightness(0.75);
+    pointer-events: none;
+}
+.rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-header {
+    opacity: 0.6;
+    filter: grayscale(0.4);
+}
+/* Re-enable pointer events on the enable toggle label so the user can turn it back on */
+.rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-content label:has(#rt-agent-router-enable) {
+    pointer-events: auto;
+    opacity: 1;
+    filter: none;
+}
+
 /* Paused via the pause button — visible but indicating pause */
 .rpg-tracker-panel.is-paused .rpg-tracker-memo-area,
 .rpg-tracker-panel.is-paused .rpg-tracker-render-view {
