@@ -688,6 +688,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 
     // -- Phase B: For each book, load existing entries, append new ones, save to disk via HTTP API --
     const knownBookNames = Object.keys(allBooks);
+    /** @type {Set<string>} books written this pass that need activation */
+    const booksWritten = new Set();
     for (const [targetBook, recs] of bookQueue.entries()) {
         if (settings.debugMode) console.log(`[RPG Tracker] Writing ${recs.length} entries to: ${targetBook}`);
 
@@ -756,25 +758,28 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             console.error(`[RPG Tracker] Failed to save ${targetBook}: HTTP ${saveRes.status}`);
         } else {
             if (settings.debugMode) console.log(`[RPG Tracker] Saved ${recs.length} entries to ${targetBook}`);
-            // Give the backend a moment to flush to disk and the indexer to see it
-            await new Promise(r => setTimeout(r, 200));
-            // Force SillyTavern to re-index its list of world info books
-            if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList();
-            
-            // â”€â”€ Cache bust: write bookData into ST's in-memory registry so that the
-            // subsequent renderRouterUI â†’ loadWorldInfo call sees fresh entries immediately
+            // Cache bust: write bookData into ST's in-memory registry so that the
+            // subsequent renderRouterUI -> loadWorldInfo call sees fresh entries immediately
             // (the raw HTTP API bypasses the in-memory cache; this syncs them up).
             if (typeof ctx.saveWorldInfo === 'function') {
                 try { await ctx.saveWorldInfo(targetBook, bookData); } catch (_) { /* non-fatal */ }
             }
-
-            // Auto-activate the lorebook so keywords work immediately
-            if (typeof ctx.executeSlashCommandsWithOptions === 'function') {
-                await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${targetBook}"`);
-            }
+            booksWritten.add(targetBook);
         }
     }
 
+    // Bulk-activate all written books after all disk writes are done.
+    // Doing this once at the end avoids race conditions where ST's world info
+    // list hasn't re-indexed yet when the first /world command fires.
+    if (booksWritten.size > 0 && typeof ctx.executeSlashCommandsWithOptions === 'function') {
+        await new Promise(r => setTimeout(r, 400));
+        if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList();
+        for (const bookName of booksWritten) {
+            await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${bookName}"`);
+            await new Promise(r => setTimeout(r, 100));
+        }
+        if (settings.debugMode) console.log(`[RPG Tracker] Activated books: ${[...booksWritten].join(', ')}`);
+    }
 
     // 4. Enforce Max Activations (FIFO Pruning)
     const maxActive = settings.routerMaxActivations || 5;
@@ -813,6 +818,21 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             reason: action.reason || (settings.routerBasicMode ? "Tag-based update." : "Agent tool update.")
         });
         if (settings.routerLog.length > 50) settings.routerLog.length = 50;
+
+        // Track campaign lorebooks per chat_id so they auto-activate on chat switch
+        if (booksWritten.size > 0) {
+            const chatId = typeof globalThis._rpgCurrentChatId === 'function'
+                ? globalThis._rpgCurrentChatId()
+                : null;
+            if (chatId) {
+                if (!settings.chatStates) settings.chatStates = {};
+                if (!settings.chatStates[chatId]) settings.chatStates[chatId] = {};
+                const existing = new Set(settings.chatStates[chatId].campaignBooks || []);
+                for (const b of booksWritten) existing.add(b);
+                settings.chatStates[chatId].campaignBooks = [...existing];
+            }
+        }
+
         ctx.saveSettingsDebounced();
         document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
     }

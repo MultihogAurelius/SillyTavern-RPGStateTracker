@@ -355,7 +355,18 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             refreshRenderedView();
         }
 
-        if (getSettings().routerAutoActivateBooks) {
+        // Auto-activate campaign lorebooks for this chat.
+        // Priority: per-chat tracked books (campaignBooks), then prefix-based fallback.
+        const chatBooks = s.chatStates?.[newChatId]?.campaignBooks;
+        if (chatBooks?.length && typeof SillyTavern.getContext().executeSlashCommandsWithOptions === 'function') {
+            (async () => {
+                const ctx = SillyTavern.getContext();
+                if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList().catch(() => {});
+                for (const bookName of chatBooks) {
+                    await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${bookName}"`).catch(() => {});
+                }
+            })();
+        } else if (s.routerAutoActivateBooks) {
             activateCampaignBooks().catch(() => {});
         }
 
@@ -1181,6 +1192,7 @@ Rules:
     // Removed when memo-processor.js is created in Phase 5.
     globalThis._rpgRunStateModelPass = runStateModelPass;
     globalThis._rpgStateModelRunning = () => _stateModelRunning;
+    globalThis._rpgCurrentChatId = () => _currentChatId;
 
     function handleLevelUp() {
         const { sendSystemMessage } = SillyTavern.getContext();
@@ -2829,68 +2841,7 @@ Rules:
                 });
             }
 
-            // ── Pick prefix from existing world info books ──
-            const prefixPickBtn = panel.querySelector('#rpg_tracker_router_prefix_pick');
-            if (prefixPickBtn && prefixInput) {
-                prefixPickBtn.addEventListener('click', async () => {
-                    const ctx = SillyTavern.getContext();
-                    if (typeof ctx.updateWorldInfoList === 'function') {
-                        try { await ctx.updateWorldInfoList(); } catch (_) {}
-                    }
-                    let allNames = [];
-                    if (typeof ctx.getWorldInfoNames === 'function') {
-                        try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
-                    }
-                    if (!allNames.length) {
-                        toastr['info']('No world info books found.', 'Lorebook Agent');
-                        return;
-                    }
-                    // Build unique root prefixes: the part before the first "_" (or the full name)
-                    const roots = [...new Set(allNames.map(n => {
-                        const idx = n.indexOf('_');
-                        return idx > 0 ? n.slice(0, idx) : n;
-                    }))].sort();
-
-                    // Build an inline floating dropdown
-                    const existing = document.getElementById('rt-prefix-pick-dropdown');
-                    if (existing) existing.remove();
-
-                    const dropdown = document.createElement('div');
-                    dropdown.id = 'rt-prefix-pick-dropdown';
-                    dropdown.style.cssText = 'position:absolute; z-index:99999; background:#1e1e2e; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:4px 0; max-height:240px; overflow-y:auto; min-width:180px; box-shadow:0 4px 16px rgba(0,0,0,0.5);';
-
-                    roots.forEach(r => {
-                        const item = document.createElement('div');
-                        item.textContent = r;
-                        item.style.cssText = 'padding:6px 12px; cursor:pointer; font-size:0.9em; color:#ddd;';
-                        item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.08)'; });
-                        item.addEventListener('mouseleave', () => { item.style.background = ''; });
-                        item.addEventListener('click', () => {
-                            const s = getSettings();
-                            s.routerCampaignPrefix = r;
-                            prefixInput.value = r;
-                            saveSettings();
-                            if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
-                            dropdown.remove();
-                            toastr['success'](`Campaign prefix set to "${r}"`, 'Lorebook Agent');
-                        });
-                        dropdown.appendChild(item);
-                    });
-
-                    const btnRect = /** @type {HTMLElement} */ (prefixPickBtn).getBoundingClientRect();
-                    dropdown.style.top = (btnRect.bottom + window.scrollY + 4) + 'px';
-                    dropdown.style.left = (btnRect.left + window.scrollX) + 'px';
-                    document.body.appendChild(dropdown);
-
-                    const closeOnOutsideClick = (/** @type {MouseEvent} */ ev) => {
-                        if (!dropdown.contains(/** @type {Node} */ (ev.target))) {
-                            dropdown.remove();
-                            document.removeEventListener('click', closeOnOutsideClick, true);
-                        }
-                    };
-                    setTimeout(() => document.addEventListener('click', closeOnOutsideClick, true), 0);
-                });
-            }
+            // ── Pick prefix: wired in settings section below ──
             
             const sourceSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-source'));
             const profGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-profile-group'));
@@ -5822,6 +5773,67 @@ Rules:
                 if (s.chatLinkEnabled && _currentChatId) {
                     saveChatState(_currentChatId);
                 }
+            });
+
+            // ── Pick prefix from existing world info books (settings sidebar) ──
+            $('#rpg_tracker_router_prefix_pick').on('click', async function () {
+                const ctx = SillyTavern.getContext();
+                if (typeof ctx.updateWorldInfoList === 'function') {
+                    try { await ctx.updateWorldInfoList(); } catch (_) {}
+                }
+                let allNames = [];
+                if (typeof ctx.getWorldInfoNames === 'function') {
+                    try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
+                }
+                if (!allNames.length) {
+                    toastr['info']('No world info books found.', 'Lorebook Agent');
+                    return;
+                }
+                const roots = [...new Set(allNames.map(n => {
+                    const idx = n.indexOf('_');
+                    return idx > 0 ? n.slice(0, idx) : n;
+                }))].sort();
+
+                const btn = /** @type {HTMLElement} */ (this);
+                const existing = document.getElementById('rt-prefix-pick-dropdown');
+                if (existing) { existing.remove(); return; }
+
+                const dropdown = document.createElement('div');
+                dropdown.id = 'rt-prefix-pick-dropdown';
+                dropdown.style.cssText = 'position:fixed; z-index:99999; background:#1e1e2e; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:4px 0; max-height:240px; overflow-y:auto; min-width:180px; box-shadow:0 4px 16px rgba(0,0,0,0.5);';
+
+                roots.forEach(r => {
+                    const item = document.createElement('div');
+                    item.textContent = r;
+                    item.style.cssText = 'padding:6px 12px; cursor:pointer; font-size:0.9em; color:#ddd;';
+                    item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.08)'; });
+                    item.addEventListener('mouseleave', () => { item.style.background = ''; });
+                    item.addEventListener('click', () => {
+                        const s = getSettings();
+                        s.routerCampaignPrefix = r;
+                        $('#rpg_tracker_router_campaign_prefix').val(r);
+                        const agentPrefixInput = /** @type {HTMLInputElement} */ (document.querySelector('#rpg_tracker_router_campaign_prefix'));
+                        if (agentPrefixInput) agentPrefixInput.value = r;
+                        saveSettings();
+                        if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
+                        dropdown.remove();
+                        toastr['success'](`Campaign prefix set to "${r}"`, 'Lorebook Agent');
+                    });
+                    dropdown.appendChild(item);
+                });
+
+                const btnRect = btn.getBoundingClientRect();
+                dropdown.style.top = (btnRect.bottom + 4) + 'px';
+                dropdown.style.left = btnRect.left + 'px';
+                document.body.appendChild(dropdown);
+
+                const closeOnOutsideClick = (/** @type {MouseEvent} */ ev) => {
+                    if (!dropdown.contains(/** @type {Node} */ (ev.target))) {
+                        dropdown.remove();
+                        document.removeEventListener('click', closeOnOutsideClick, true);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', closeOnOutsideClick, true), 0);
             });
 
             // Router Ollama
