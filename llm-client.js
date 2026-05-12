@@ -443,3 +443,192 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
         }
     }
 }
+
+// ── Agent Turn (multi-turn + native tool calling) ─────────────────────────────
+
+/**
+ * Sends one turn of the agent loop.
+ *
+ * For openai / ollama connections: sends a proper multi-turn messages[] array
+ * with native OpenAI-format tools so the model returns structured tool_calls —
+ * zero regex parsing.
+ *
+ * For profile / default connections: sends the same multi-turn messages array
+ * but without tools (profile handles its own API routing). The caller is still
+ * responsible for text-fallback parsing if needed, but since each call only
+ * covers the current turn the model will never echo prior turns, making even
+ * simple regex reliable.
+ *
+ * @param {ReturnType<import('./state-manager.js').getSettings>} settings
+ * @param {Array<{role:string, content:string|null, tool_calls?:any[], tool_call_id?:string}>} messages
+ * @param {Array<object>|null} tools   OpenAI-format tool schemas, or null to skip tool calling.
+ * @param {AbortSignal|null} signal
+ * @returns {Promise<{content: string, toolCall: {name: string, args: object, id: string} | null}>}
+ */
+export async function sendAgentTurn(settings, messages, tools = null, signal = null) {
+    const context = SillyTavern.getContext();
+
+    // ── OpenAI compatible ────────────────────────────────────────────────────
+    if (settings.connectionSource === 'openai') {
+        const url = settings.openaiUrl;
+        const apiKey = settings.openaiKey;
+        const model = settings.openaiModel;
+        if (!url) throw new Error('OpenAI Compatible URL is not configured.');
+        if (!model) throw new Error('OpenAI Compatible model name is not set.');
+
+        const baseUrl = url.replace(/\/+$/, '');
+        let endpoint = baseUrl;
+        if (!endpoint.endsWith('/chat/completions')) {
+            if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
+            else if (!endpoint.includes('/chat/completions')) endpoint += '/v1/chat/completions';
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+        const presetSettings = _getPresetData(settings, context);
+
+        const body = {
+            model,
+            messages,
+            temperature: presetSettings.temperature ?? presetSettings.temp ?? presetSettings.temp_openai ?? 0.1,
+            top_p: presetSettings.top_p ?? presetSettings.top_p_openai ?? 1.0,
+            stream: false,
+        };
+        if (tools?.length) body.tools = tools;
+        if (settings.maxTokens > 0) body.max_tokens = settings.maxTokens;
+
+        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+|10\.\d|172\.(1[6-9]|2\d|3[01])\.)/i.test(endpoint);
+        let resp;
+        if (isLocal) {
+            try {
+                resp = await fetch(proxiedUrl(endpoint), { method: 'POST', headers: { ...headers, ...getProxyHeaders() }, body: JSON.stringify(body), signal });
+                if (!resp.ok && resp.status === 404) throw new Error('proxy 404');
+            } catch (_) {
+                resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), credentials: 'omit', signal });
+            }
+        } else {
+            resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), credentials: 'omit', signal });
+        }
+        if (!resp.ok) throw new Error(`OpenAI request failed (${resp.status})`);
+        const data = await resp.json();
+        const msg = data.choices?.[0]?.message;
+        if (msg?.tool_calls?.length) {
+            const tc = msg.tool_calls[0];
+            let args;
+            try { args = JSON.parse(tc.function.arguments); } catch (_) { args = {}; }
+            return { content: msg.content || '', toolCall: { name: tc.function.name, args, id: tc.id } };
+        }
+        const text = msg?.content ?? data.choices?.[0]?.text ?? '';
+        return { content: text, toolCall: null };
+    }
+
+    // ── Ollama ───────────────────────────────────────────────────────────────
+    if (settings.connectionSource === 'ollama') {
+        const baseUrl = (settings.ollamaUrl || '').replace(/\/+$/, '');
+        const model = settings.ollamaModel;
+        if (!baseUrl) throw new Error('Ollama URL is not configured.');
+        if (!model) throw new Error('Ollama model is not selected.');
+
+        const targetUrl = `${baseUrl}/api/chat`;
+        const presetSettings = _getPresetData(settings, context);
+
+        const body = {
+            model,
+            messages,
+            stream: false,
+            options: {
+                temperature: presetSettings.temperature ?? presetSettings.temp ?? 0.1,
+                top_p: presetSettings.top_p ?? 1.0,
+            },
+        };
+        if (tools?.length) body.tools = tools;
+
+        let resp;
+        try {
+            resp = await fetch(proxiedUrl(targetUrl), { method: 'POST', headers: { ...{ 'Content-Type': 'application/json' }, ...getProxyHeaders() }, body: JSON.stringify(body), signal });
+            if (!resp.ok && resp.status === 404) throw new Error('proxy 404');
+        } catch (_) {
+            resp = await fetch(targetUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
+        }
+        if (!resp.ok) throw new Error(`Ollama request failed (${resp.status})`);
+        const data = await resp.json();
+        const msg = data.message;
+        if (msg?.tool_calls?.length) {
+            const tc = msg.tool_calls[0];
+            const args = tc.function?.arguments ?? {};
+            return { content: msg.content || '', toolCall: { name: tc.function.name, args, id: `call_${Date.now()}` } };
+        }
+        return { content: msg?.content ?? '', toolCall: null };
+    }
+
+    // ── Profile (ConnectionManagerRequestService) ────────────────────────────
+    if (settings.connectionSource === 'profile' && settings.connectionProfileId) {
+        const service = context.ConnectionManagerRequestService;
+        if (service && typeof service.sendRequest === 'function') {
+            const maxTokens = settings.maxTokens > 0 ? settings.maxTokens : undefined;
+            const raw = await service.sendRequest(
+                settings.connectionProfileId,
+                messages,
+                maxTokens,
+                { stream: false, extractData: true, includePreset: true, includeInstruct: true,
+                  presetName: settings.completionPresetId || undefined,
+                  ...(tools?.length ? { tools } : {}),
+                  signal }
+            );
+            if (typeof raw === 'string') return { content: raw, toolCall: null };
+            const r = /** @type {any} */ (raw);
+            // Check for native tool_calls first
+            const tc = r?.choices?.[0]?.message?.tool_calls?.[0] ?? r?.tool_calls?.[0] ?? null;
+            if (tc) {
+                let args;
+                try { args = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : (tc.function?.arguments ?? {}); } catch (_) { args = {}; }
+                return { content: r?.choices?.[0]?.message?.content || '', toolCall: { name: tc.function.name, args, id: tc.id || `call_${Date.now()}` } };
+            }
+            const text = r?.content ?? r?.message?.content ?? r?.choices?.[0]?.message?.content ?? r?.choices?.[0]?.text ?? r?.reasoning ?? r?.message?.reasoning ?? r?.choices?.[0]?.message?.reasoning ?? null;
+            if (text) return { content: text, toolCall: null };
+            throw new Error(`[RPG Tracker] Profile agent turn returned unexpected type: ${JSON.stringify(raw).substring(0, 200)}`);
+        }
+    }
+
+    // ── Default (generateRaw fallback) ───────────────────────────────────────
+    const { generateRaw } = context;
+    if (!generateRaw) throw new Error('[RPG Tracker] generateRaw is not available.');
+
+    // Reconstruct flat prompts from messages array for generateRaw
+    const systemMsg = messages.find(m => m.role === 'system');
+    const nonSystem = messages.filter(m => m.role !== 'system');
+    const flatUser = nonSystem.map(m => {
+        if (m.role === 'tool') return `Observation: ${m.content}`;
+        if (m.role === 'assistant' && m.tool_calls) return `Action: ${m.tool_calls[0]?.function?.name}(${m.tool_calls[0]?.function?.arguments})`;
+        return m.content || '';
+    }).join('\n\n');
+
+    let originalPreset2 = null;
+    try {
+        if (settings.completionPresetId) {
+            originalPreset2 = await getCurrentCompletionPreset();
+            await setCompletionPreset(settings.completionPresetId);
+        }
+        const options = { prompt: flatUser, systemPrompt: systemMsg?.content || '', bypassAll: true, signal };
+        if (settings.maxTokens > 0) options.responseLength = settings.maxTokens;
+        const result = await generateRaw(options);
+        const text = typeof result === 'string' ? result : (/** @type {any} */ (result))?.choices?.[0]?.message?.content ?? '';
+        return { content: text, toolCall: null };
+    } finally {
+        if (originalPreset2 && settings.completionPresetId && originalPreset2 !== settings.completionPresetId) {
+            await setCompletionPreset(originalPreset2);
+        }
+    }
+}
+
+/** Internal: resolve preset settings by name from the active preset manager. */
+function _getPresetData(settings, context) {
+    if (!settings.completionPresetId) return {};
+    for (const type of [undefined, 'textgenerationwebui', 'openai']) {
+        const mgr = context.getPresetManager(type);
+        const data = mgr?.getCompletionPresetByName(settings.completionPresetId);
+        if (data) return data;
+    }
+    return {};
+}

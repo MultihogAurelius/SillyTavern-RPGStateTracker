@@ -1,5 +1,5 @@
-import { getSettings } from './state-manager.js';
-import { sendStateRequest } from './llm-client.js';
+﻿import { getSettings } from './state-manager.js';
+import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
@@ -142,103 +142,41 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         // 2. The Loop
         let turns = 0;
         const maxTurns = settings.routerMaxTurns || 5;
-        let loopHistory = [];
-        let finalAction = null;
+        let basicSummaryText = '';
 
-        const basePrompt = (settings.routerSystemPromptTemplate || "You are the Lorebook Agent. Maintain narrative consistency and manage lorebooks.")
+        const routerSettings = {
+            ...settings,
+            connectionSource: settings.routerConnectionSource || 'default',
+            connectionProfileId: settings.routerConnectionProfileId,
+            completionPresetId: settings.routerCompletionPresetId,
+            ollamaUrl: settings.routerOllamaUrl,
+            ollamaModel: settings.routerOllamaModel,
+            openaiUrl: settings.routerOpenaiUrl,
+            openaiKey: settings.routerOpenaiKey,
+            openaiModel: settings.routerOpenaiModel,
+            maxTokens: (settings.routerMaxTokens !== undefined && settings.routerMaxTokens !== null && settings.routerMaxTokens !== '') ? Number(settings.routerMaxTokens) : 1000,
+        };
+
+        const basePrompt = (settings.routerSystemPromptTemplate || 'You are the Lorebook Agent. Maintain narrative consistency and manage lorebooks.')
             .replace(/\{\{campaignRoot\}\}/g, prefix || 'World Chronicle')
             .replace(/\{\{user\}\}/g, ctx.name1 || 'User');
 
-        const systemPrompt = `${basePrompt}
+        // -- Basic Mode (tag-based, one-shot, no tool calling) -----------------
+        if (settings.routerBasicMode) {
+            const modules = settings.routerModules || {};
+            const customTags = settings.routerCustomTags || [];
+            const formatLines = [];
+            for (const config of Object.values(modules)) {
+                if (config.enabled) formatLines.push(`- [[${config.tag}: ${config.format}]] (${config.instruction})`);
+            }
+            for (const custom of customTags) {
+                formatLines.push(`- [[${custom.tag}: Name | Description | Keywords]] (${custom.instruction})`);
+            }
+            formatLines.push(`- [[ACTIVATE: Name]] (Bring entry to active memory)`);
+            formatLines.push(`- [[DEACTIVATE: Name]] (Remove from active memory)`);
+            formatLines.push(`- [[DELETE: Name]] (Permanently remove an entry)`);
 
-## TOOLS
-1. grep_lore(query): Search all lorebooks in scope ("${prefix || 'All'}") for keywords.
-2. inspect_book(book_name): List entries in a specific book.
-3. read_entry(uid): Read the full content of an archive entry.
-4. commit(activate, deactivate, record, update, delete_ids): Final action. Ends loop.
-   - activate/deactivate: ["Book::UID", ...] (Toggles presence in active context)
-   - record: [{"label": "Name only — NO tag prefix (e.g. 'Iron Syndicate', NOT 'FAC: Iron Syndicate')", "keys": ["keyword1", ...], "content": "Description", "category": "NPC|LOC|QUEST|FAC|EVENT${(settings.routerCustomTags || []).length ? '|' + (settings.routerCustomTags || []).map(t => t.tag.toUpperCase()).join('|') : ''}"}]
-   - update: [{"id": "Book::UID", "content": "Full new content"}]
-   - delete_ids: ["Book::UID", ...] (Permanently REMOVES from lorebook)
-
-## MEMORY LIMIT
-Maximum Active Entities: **${settings.routerMaxActivations || 5}**.
-- If you are at the limit and need to activate a new entity, you MUST use \`commit({"deactivate": ["Book::UID"]})\` on the least relevant active entity.
-- **IMPORTANT**: Entries you \`record\` are ACTIVATED AUTOMATICALLY. Do not include them in the \`activate\` list of the same commit.
-- **IMPORTANT**: You MUST use the exact \`Book::UID\` format for activation/update. Never use names or invent IDs.
-
-## PROCESS
-1. **SEARCH FIRST**: Use \`grep_lore\` or \`inspect_book\` to find IDs.
-2. **MODULAR UPDATES**: You can use \`commit\` to record NEW info or update existing entries. 
-   - **Note**: If you \`record\` an entry with a label that already exists, it will AUTOMATICALLY update the existing one.
-3. **TERMINATION**: You are allocated a turn budget, but you should **STOP** as soon as the archive is synchronized with the latest events. To finish, simply provide a final Thought summarizing your work and **do not output any Action tag**.
-
-Campaign Root: "${prefix || 'World Archive'}" (NPCs/Locations go into "${prefix ? prefix + '_NPCs' : 'NPCs'}" or "${prefix ? prefix + '_Locations' : 'Locations'}").
-
-## EXAMPLE
-Thought: The user mentioned Elara. I will check if she exists.
-Action: grep_lore("Elara")
-Observation: Found "Adventure_NPCs::0" (Elara).
-Thought: She already exists. I will update her description and activate her.
-Action: commit({"update":[{"id":"Adventure_NPCs::0","content":"Now a known ally."}], "activate":["Adventure_NPCs::0"]})
-Observation: Committed successfully.
-Thought: I have updated Elara. Research complete.
-
-Campaign Root: "${prefix || 'World Archive'}"
-Hierarchy: When recording locations or NPCs, use the current breadcrumb (${breadcrumb || 'Root'}) as a prefix in the label using the " :: " separator.
-Example: "Khelt :: Section Four :: Impact Site"
-
-Categories: For every ancestor in the hierarchy, include its name as a plain keyword.
-Example Keywords: "scholarly, Khelt, Section Four" (Note: do not include the name of the entry itself in its own keywords).
-
-## FIELD INSTRUCTIONS
-${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}
-${(settings.routerCustomTags || []).length ? '\n### CUSTOM CATEGORIES\nUse these tag names as the "category" field in commit record calls. Each custom category is stored in its own lorebook.\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}
-`;
-
-        while (turns < maxTurns) {
-            turns++;
-            
-            const questMatch = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
-            const questBlock = questMatch ? `[QUESTS]${questMatch[1].trim()}[/QUESTS]` : 'None';
-            
-            const userPrompt = `## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlock}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}${loopHistory.join('\n\n')}\n\nNext Step:`;
-
-            const routerSettings = {
-                ...settings,
-                connectionSource: settings.routerConnectionSource || "default",
-                connectionProfileId: settings.routerConnectionProfileId,
-                completionPresetId: settings.routerCompletionPresetId,
-                ollamaUrl: settings.routerOllamaUrl,
-                ollamaModel: settings.routerOllamaModel,
-                openaiUrl: settings.routerOpenaiUrl,
-                openaiKey: settings.routerOpenaiKey,
-                openaiModel: settings.routerOpenaiModel,
-                maxTokens: (settings.routerMaxTokens !== undefined && settings.routerMaxTokens !== null && settings.routerMaxTokens !== '') ? Number(settings.routerMaxTokens) : 1000,
-            };
-
-            const thinkingMsg = settings.routerBasicMode ? 'Thinking...' : `Thinking (Turn ${turns}/${maxTurns})...`;
-            broadcastStep('thought', thinkingMsg);
-            
-            let currentSystemPrompt = systemPrompt;
-            if (settings.routerBasicMode) {
-                const modules = settings.routerModules || {};
-                const customTags = settings.routerCustomTags || [];
-                
-                let formatLines = [];
-                for (const [id, config] of Object.entries(modules)) {
-                    if (config.enabled) {
-                        formatLines.push(`- [[${config.tag}: ${config.format}]] (${config.instruction})`);
-                    }
-                }
-                for (const custom of customTags) {
-                    formatLines.push(`- [[${custom.tag}: Name | Description | Keywords]] (${custom.instruction})`);
-                }
-                formatLines.push(`- [[ACTIVATE: Name]] (Bring entry to active memory)`);
-                formatLines.push(`- [[DEACTIVATE: Name]] (Remove from active memory)`);
-                formatLines.push(`- [[DELETE: Name]] (Permanently remove an entry)`);
-
-                currentSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
+            const basicSystemPrompt = `You are the Research Assistant. Your task is to identify and record important narrative entities and events.
 
 ## FORMAT
 Use these tags in your response:
@@ -260,128 +198,251 @@ ${formatLines.join('\n')}
 Example:
 Thought: I see a new NPC named Barnaby. I will record him.
 [[NPC: Barnaby | A retired blacksmith with a scar on his cheek. | Barnaby, blacksmith, ally]]`;
+
+            const questMatchB = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+            const questBlockB = questMatchB ? `[QUESTS]${questMatchB[1].trim()}[/QUESTS]` : 'None';
+            const basicUserPrompt = `## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockB}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None'}\n\n## ARCHIVE INDEX\n${keyringText}\n\n## NARRATIVE\n${recentChat}\n\n${manualPrompt ? `## INSTRUCTION\n${manualPrompt}\n\n` : ''}`;
+
+            broadcastStep('thought', 'Thinking...');
+            const basicResp = await sendStateRequest(routerSettings, basicSystemPrompt, basicUserPrompt);
+
+            const thoughtMatchB = basicResp.match(/Thought:\s*([\s\S]*?)(?=\[\[|$)/i);
+            if (thoughtMatchB) broadcastStep('thought', thoughtMatchB[1].trim());
+            broadcastStep('thought', 'Parsing tags...');
+            const basicAction = parseBasicTags(basicResp, archiveBooks);
+
+            if (basicAction.record.length > 0 || basicAction.update.length > 0 || basicAction.activate.length > 0 || basicAction.delete_ids?.length > 0) {
+                const summaries = [];
+                if (basicAction.record.length) summaries.push(`New: ${basicAction.record.length}`);
+                if (basicAction.update.length) summaries.push(`Updates: ${basicAction.update.length}`);
+                if (basicAction.activate.length) summaries.push(`Activations: ${basicAction.activate.length}`);
+                basicAction.reason = (thoughtMatchB ? thoughtMatchB[1].trim() : 'Tag-based update.') + ` (${summaries.join(', ')})`;
+                await applyAction(basicAction, archiveBooks, currentTime, breadcrumb);
+                basicSummaryText = summaries.join(', ');
+            } else {
+                broadcastStep('finish', 'Basic Mode: No tags found.');
             }
 
-            const response = await sendStateRequest(routerSettings, currentSystemPrompt, userPrompt);
-            
-            // Debug capture
-            settings.routerLastRequest = {
-                system: currentSystemPrompt,
-                user: userPrompt,
-                chars: (currentSystemPrompt.length + userPrompt.length),
-                estTokens: Math.ceil((currentSystemPrompt.length + userPrompt.length) / 4)
-            };
+        } else {
+            // -- Agent Mode (native tool calling, multi-turn messages) ----------
 
-            if (settings.routerBasicMode) {
-                const thoughtMatch = response.match(/Thought:\s*([\s\S]*?)(?=\[\[|$)/i);
-                if (thoughtMatch) broadcastStep('thought', thoughtMatch[1].trim());
+            // Build the commit tool's category enum from enabled modules + custom tags
+            const validCategories = [
+                ...Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => m.tag.toUpperCase()),
+                ...(settings.routerCustomTags || []).map(t => t.tag.toUpperCase()),
+            ];
+            const categoryEnum = validCategories.length ? validCategories : ['NPC', 'LOC', 'QUEST', 'FAC', 'EVENT'];
 
-                broadcastStep('thought', 'Parsing tags...');
-                const basicAction = parseBasicTags(response, archiveBooks);
-                
-                if (basicAction.record.length > 0 || basicAction.update.length > 0 || basicAction.activate.length > 0 || basicAction.delete_ids?.length > 0) {
-                    const summaries = [];
-                    if (basicAction.record.length) summaries.push(`New: ${basicAction.record.length}`);
-                    if (basicAction.update.length) summaries.push(`Updates: ${basicAction.update.length}`);
-                    if (basicAction.activate.length) summaries.push(`Activations: ${basicAction.activate.length}`);
-                    
-                    basicAction.reason = (thoughtMatch ? thoughtMatch[1].trim() : "Tag-based update.") + ` (${summaries.join(', ')})`;
-                    
-                    await applyAction(basicAction, archiveBooks, currentTime, breadcrumb);
-                    basicSummary = summaries.join(', ');
-                } else {
-                    broadcastStep('finish', 'Basic Mode: No tags found.');
-                }
-                break; // One-shot for basic mode
-            }
-
-            const thoughtMatch = response.match(/Thought:\s*([\s\S]*?)(?=Action:|$)/i);
-            const actionMatch = response.match(/(?:Action:\s*)?(\w+)\(([\s\S]*)\)/i);
-
-            if (thoughtMatch) broadcastStep('thought', thoughtMatch[1].trim());
-
-            if (actionMatch) {
-                const toolName = actionMatch[1].toLowerCase();
-                const argsStr = actionMatch[2].trim();
-                broadcastStep('tool', `${toolName}(...)`);
-
-                let observation = "";
-                if (toolName === 'commit') {
-                    const cleanJson = (str) => {
-                        let clean = str.match(/\{[\s\S]*\}/)?.[0] || str;
-                        if (!clean.includes('"') && clean.includes("'")) {
-                            clean = clean.replace(/'/g, '"');
+            /** @type {Array<object>} */
+            const agentTools = [
+                {
+                    type: 'function',
+                    function: {
+                        name: 'grep_lore',
+                        description: `Search all lorebooks in scope ("${prefix || 'All'}") for entries whose content or label contains the query.`,
+                        parameters: {
+                            type: 'object',
+                            properties: { query: { type: 'string', description: 'Keyword or phrase to search for.' } },
+                            required: ['query']
                         }
-                        clean = clean.replace(/,\s*\}/g, '}').replace(/,\s*\]/g, ']');
-                        return clean;
-                    };
-
-                    try {
-                        const currentAction = JSON.parse(cleanJson(argsStr));
-                        const result = await applyAction(currentAction, archiveBooks, currentTime, breadcrumb);
-                        
-                        // REFRESH STATE: Re-load books so next loop sees new entries
-                        archiveBooks = await fetchArchiveBooks();
-                        keyringText = buildKeyringText(archiveBooks);
-                        updateActiveEntries();
-                        
-                        if (result.errors.length > 0) {
-                            observation = `Committed with warnings: ${result.errors.join(', ')}`;
-                        } else {
-                            const details = [];
-                            if (result.recordedIds?.length > 0) details.push(`Recorded/Updated: ${result.recordedIds.join(', ')}`);
-                            if (currentAction.activate?.length > 0) details.push(`Activated: ${currentAction.activate.join(', ')}`);
-                            observation = `Committed successfully. ${details.join(' | ')}`;
-                        }
-                    } catch (e) {
-                        observation = `Error: Invalid JSON in commit. ${e.message}`;
                     }
-                } else if (toolName === 'grep_lore') {
-                    const query = argsStr.replace(/['"]/g, '').trim();
-                    const results = [];
-                    for (const [name, book] of Object.entries(archiveBooks)) {
-                        for (const [uid, entry] of Object.entries(book.entries)) {
-                            if (entry.content.toLowerCase().includes(query.toLowerCase())) {
-                                results.push(`[${name}::${uid}] Match: ${entry.content.substring(0, 100)}...`);
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'inspect_book',
+                        description: 'List all entry labels and UIDs in a specific lorebook.',
+                        parameters: {
+                            type: 'object',
+                            properties: { book_name: { type: 'string', description: 'Exact lorebook name (e.g. "Eldoria_Factions").' } },
+                            required: ['book_name']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'read_entry',
+                        description: 'Read the full content of a lorebook entry.',
+                        parameters: {
+                            type: 'object',
+                            properties: { uid: { type: 'string', description: 'Entry UID in "BookName::0" format.' } },
+                            required: ['uid']
+                        }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'commit',
+                        description: 'Write all changes to the lorebook and finish the research pass. The ONLY way to persist data.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                record: {
+                                    type: 'array',
+                                    description: 'New entries to create. Recording an entry with an existing label automatically updates it.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            label: { type: 'string', description: 'Entity name only. NO tag prefix (e.g. "Iron Syndicate", NOT "FAC: Iron Syndicate").' },
+                                            keys:  { type: 'array', items: { type: 'string' }, description: 'Search keywords. Include ancestor location names.' },
+                                            content:  { type: 'string', description: 'Full description.' },
+                                            category: { type: 'string', enum: categoryEnum, description: 'Determines which lorebook the entry goes into.' }
+                                        },
+                                        required: ['label', 'keys', 'content', 'category']
+                                    }
+                                },
+                                update: {
+                                    type: 'array',
+                                    description: 'Append new information to existing entries.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            id:      { type: 'string', description: 'Book::UID format (e.g. "Eldoria_NPCs::0").' },
+                                            content: { type: 'string', description: 'New information to append.' }
+                                        },
+                                        required: ['id', 'content']
+                                    }
+                                },
+                                activate:   { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to move into active context.' },
+                                deactivate: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to remove from active context.' },
+                                delete_ids: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to permanently delete.' }
                             }
                         }
                     }
-                    observation = results.length > 0 ? results.join('\n') : "No matches found.";
+                }
+            ];
+
+            // System prompt for agent mode — no Action:/Observation: text format since
+            // the model uses native tool calling and gets the schemas separately.
+            const agentSystemPrompt = `${basePrompt}
+
+## YOUR ROLE
+You are a lorebook research agent. Maintain the campaign lorebook using the tools provided.
+Use grep_lore / inspect_book / read_entry to look up existing data before recording.
+When research is complete, call commit once to write all changes. Stop immediately after.
+
+## MEMORY LIMIT
+Maximum Active Entities: **${settings.routerMaxActivations || 5}**.
+- Entries you record are ACTIVATED AUTOMATICALLY. Do NOT also include them in activate.
+- If at the limit and need space, use deactivate in the same commit call.
+- Always use exact Book::UID format (e.g. "Eldoria_NPCs::0") for activate/update/deactivate/delete_ids.
+
+## CAMPAIGN CONTEXT
+Campaign Root: "${prefix || 'World Archive'}"
+  NPCs -> "${prefix ? prefix + '_NPCs' : 'NPCs'}"
+  Locations -> "${prefix ? prefix + '_Locations' : 'Locations'}" (etc.)
+Location hierarchy: use " :: " separator in labels (e.g. "Khelt :: Rust-Lantern District :: The Guilded Anvil").
+Include ancestor location names as plain keywords (e.g. keys: ["Khelt", "Rust-Lantern District", "tavern"]).
+
+## FIELD INSTRUCTIONS
+${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
+
+            const questMatchA = settings.currentMemo?.match(/\[QUESTS\]([\s\S]*?)\[\/QUESTS\]/i);
+            const questBlockA = questMatchA ? `[QUESTS]${questMatchA[1].trim()}[/QUESTS]` : 'None';
+            const contextMessage = `## CURRENT LOCATION\n${currentHierarchy || 'Unknown'}\n\n## ACTIVE QUESTS\n${questBlockA}\n\n## ACTIVE MEMORY (Lore)\n${activeEntriesFull.join('\n\n') || 'None yet.'}\n\n## ARCHIVE INDEX\n${keyringText || 'Empty.'}\n\n## NARRATIVE\n${recentChat}${manualPrompt ? `\n\n## INSTRUCTION\n${manualPrompt}` : ''}`;
+
+            /** @type {Array<{role:string, content:string|null, tool_calls?:any[], tool_call_id?:string}>} */
+            const messages = [
+                { role: 'system', content: agentSystemPrompt },
+                { role: 'user',   content: contextMessage }
+            ];
+
+            while (turns < maxTurns) {
+                turns++;
+                broadcastStep('thought', `Thinking (Turn ${turns}/${maxTurns})...`);
+
+                const result = await sendAgentTurn(routerSettings, messages, agentTools);
+
+                // Show any inline thought the model included alongside the tool call
+                if (result.content) {
+                    const thoughtLine = result.content.match(/Thought:\s*(.*)/i)?.[1]?.trim()
+                        || result.content.trim().split('\n')[0];
+                    if (thoughtLine) broadcastStep('thought', thoughtLine.substring(0, 200));
+                }
+
+                if (!result.toolCall) {
+                    // No tool call = model is done thinking, no more actions
+                    break;
+                }
+
+                const { name: toolName, args } = result.toolCall;
+                const callId = /** @type {any} */ (result.toolCall).id || `call_${Date.now()}_${turns}`;
+                broadcastStep('tool', `${toolName}(...)`);
+
+                // Append the assistant turn (with tool_calls) to the conversation
+                messages.push({
+                    role: 'assistant',
+                    content: result.content || null,
+                    tool_calls: [{
+                        id:   callId || `call_${Date.now()}_${turns}`,
+                        type: 'function',
+                        function: { name: toolName, arguments: JSON.stringify(args) }
+                    }]
+                });
+
+                let observation = '';
+
+                if (toolName === 'commit') {
+                    const commitResult = await applyAction(args, archiveBooks, currentTime, breadcrumb);
+                    archiveBooks = await fetchArchiveBooks();
+                    keyringText = buildKeyringText(archiveBooks);
+                    updateActiveEntries();
+                    if (commitResult.errors.length > 0) {
+                        observation = `Committed with warnings: ${commitResult.errors.join(', ')}`;
+                    } else {
+                        const details = [];
+                        if (commitResult.recordedIds?.length > 0) details.push(`Recorded/Updated: ${commitResult.recordedIds.join(', ')}`);
+                        if (args.activate?.length > 0) details.push(`Activated: ${args.activate.join(', ')}`);
+                        observation = `Committed successfully. ${details.join(' | ')}`;
+                    }
+                } else if (toolName === 'grep_lore') {
+                    const query = (args.query || '').toLowerCase();
+                    const hits = [];
+                    for (const [name, book] of Object.entries(archiveBooks)) {
+                        for (const [uid, entry] of Object.entries(book.entries)) {
+                            if ((entry.content || '').toLowerCase().includes(query) || (entry.comment || '').toLowerCase().includes(query)) {
+                                hits.push(`[${name}::${uid}] "${entry.comment || uid}": ${(entry.content || '').substring(0, 120)}...`);
+                            }
+                        }
+                    }
+                    observation = hits.length > 0 ? hits.join('\n') : `No entries found for "${args.query}".`;
                 } else if (toolName === 'inspect_book') {
-                    const bookName = argsStr.replace(/['"]/g, '').trim();
+                    const bookName = args.book_name || '';
                     if (archiveBooks[bookName]) {
                         observation = Object.entries(archiveBooks[bookName].entries)
-                            .map(([uid, e]) => `${bookName}::${uid} - ${e.comment || e.key?.[0]}`)
+                            .map(([uid, e]) => `${bookName}::${uid} -- ${e.comment || e.key?.[0] || uid}`)
                             .join('\n');
                     } else {
-                        observation = "Error: Book not found.";
+                        observation = `Book "${bookName}" not found. Available: ${Object.keys(archiveBooks).join(', ') || 'none'}`;
                     }
                 } else if (toolName === 'read_entry') {
-                    const uid = argsStr.replace(/['"]/g, '').trim();
+                    const uid = args.uid || '';
                     const [bookName, id] = uid.split('::');
                     const book = await ctx.loadWorldInfo(bookName);
-                    observation = book?.entries?.[id] ? book.entries[id].content : "Error: Entry not found.";
+                    observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
                 } else {
-                    observation = "Error: Unknown tool.";
+                    observation = `Unknown tool: ${toolName}`;
                 }
 
                 broadcastStep('result', observation.substring(0, 200) + (observation.length > 200 ? '...' : ''));
-                loopHistory.push(`Thought: ${thoughtMatch?.[1] || '...'}\nAction: ${toolName}(${argsStr})\nObservation: ${observation}`);
-            } else {
-                break; 
+
+                // Append the tool result so the model sees it on the next turn
+                messages.push({
+                    role: 'tool',
+                    tool_call_id: messages[messages.length - 1].tool_calls[0].id,
+                    content: observation
+                });
+
+                // commit always ends the research pass
+                if (toolName === 'commit') break;
             }
-        }
+        } // end agent mode
 
         const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-        const finishMsg = basicSummary ? `Finished in ${totalTime}s â€” ${basicSummary}` : `Finished in ${totalTime}s`;
+        const finishMsg = basicSummaryText ? `Finished in ${totalTime}s -- ${basicSummaryText}` : `Finished in ${totalTime}s`;
         broadcastStep('finish', finishMsg, { time: totalTime, turns });
-
-        // Final application for Basic Mode
-        if (settings.routerBasicMode && turns === 1) {
-             // Handled inside the loop
-        } else if (finalAction) {
-            await applyAction(finalAction, archiveBooks);
-        }
 
         return true;
     } catch (e) {
