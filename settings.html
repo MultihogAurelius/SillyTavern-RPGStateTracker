@@ -277,10 +277,16 @@
                             <p style="font-size: 10px; opacity: 0.6; margin: 0;">Namespace for this campaign's lorebooks (e.g. <i>Eldoria</i> → <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>…). Saved per-chat.</p>
                         </div>
 
-                        <label class="checkbox_label" style="margin-bottom: 8px;" title="When enabled, all lorebooks belonging to this campaign auto-activate whenever you switch to this chat.">
-                            <input id="rpg_tracker_router_auto_activate" type="checkbox" />
-                            <span>Auto-activate book stack on chat switch</span>
-                        </label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+                            <label class="checkbox_label" style="flex: 1; min-width: 0;" title="When enabled, all lorebooks belonging to this campaign auto-activate whenever you switch to this chat.">
+                                <input id="rpg_tracker_router_auto_activate" type="checkbox" />
+                                <span>Auto-activate on chat switch</span>
+                            </label>
+                            <label class="checkbox_label" style="flex: 1; min-width: 0;" title="When enabled, switching to a chat with no linked lorebook stack will show a small prompt to set one.">
+                                <input id="rpg_tracker_router_prompt_prefix" type="checkbox" />
+                                <span>Prompt if no stack linked</span>
+                            </label>
+                        </div>
                         
                         <div class="inline-drawer">
                             <div class="inline-drawer-toggle inline-drawer-header">
