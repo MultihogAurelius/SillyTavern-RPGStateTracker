@@ -251,8 +251,12 @@
     filter: grayscale(0.6) brightness(0.8);
     pointer-events: none;
 }
+/* The header and its buttons must always be clickable so the user can re-enable */
+.rpg-tracker-panel.is-disabled .rpg-tracker-header {
+    pointer-events: auto;
+}
 
-/* Agent panel disabled — dim content but keep header + enable toggle interactive */
+/* Agent panel disabled — dim content but keep header interactive */
 .rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-content {
     opacity: 0.45;
     filter: grayscale(0.5) brightness(0.75);
@@ -261,6 +265,7 @@
 .rpg-tracker-agent-panel.is-agent-disabled .rpg-tracker-header {
     opacity: 0.6;
     filter: grayscale(0.4);
+    pointer-events: auto;
 }
 
 /* Paused via the pause button — visible but indicating pause */

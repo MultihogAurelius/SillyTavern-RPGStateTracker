@@ -1047,6 +1047,9 @@ Rules:
             panel.classList.add('is-disabled');
             panel.classList.remove('is-paused');
             indicator.classList.remove('active');
+            // Always keep the header clickable so the user can re-enable (belt-and-suspenders over the CSS rule)
+            const header = panel.querySelector('.rpg-tracker-header');
+            if (header) /** @type {HTMLElement} */ (header).style.pointerEvents = 'auto';
             pauseBtn.textContent = '▶';
             pauseBtn.title = 'Resume Tracker';
             if (pauseBanner) pauseBanner.textContent = '';
