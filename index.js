@@ -5854,6 +5854,37 @@ Rules:
                 setTimeout(() => document.addEventListener('click', closeOnOutsideClick, true), 0);
             });
 
+            // Link prefix to current chat
+            $('#rpg_tracker_router_prefix_link').on('click', async function () {
+                const s = getSettings();
+                const prefix = s.routerCampaignPrefix || '';
+                if (!prefix) {
+                    toastr['warning']('Set a Campaign Prefix first.', 'Lorebook Agent');
+                    return;
+                }
+                if (!_currentChatId) {
+                    toastr['warning']('No active chat to link to.', 'Lorebook Agent');
+                    return;
+                }
+                const ctx = SillyTavern.getContext();
+                if (typeof ctx.updateWorldInfoList === 'function') {
+                    try { await ctx.updateWorldInfoList(); } catch (_) {}
+                }
+                let allNames = [];
+                if (typeof ctx.getWorldInfoNames === 'function') {
+                    try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
+                }
+                const matchingBooks = allNames.filter(n => n.startsWith(prefix));
+                if (!s.chatStates) s.chatStates = {};
+                if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
+                s.chatStates[_currentChatId].campaignBooks = matchingBooks;
+                saveSettings();
+                toastr['success'](
+                    `Linked ${matchingBooks.length} lorebook(s) to this chat. They will auto-activate when you return.`,
+                    'Lorebook Agent'
+                );
+            });
+
             // Auto-activate book stack toggle (settings sidebar)
             $('#rpg_tracker_router_auto_activate')
                 .prop('checked', !!settings.routerAutoActivateBooks)
