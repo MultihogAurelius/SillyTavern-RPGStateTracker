@@ -342,6 +342,8 @@ export function saveChatState(chatId) {
     if (!chatId) return;
     const s = getSettings();
     if (!s.chatStates) s.chatStates = {};
+    // Preserve fields that are written outside the normal save cycle (e.g. campaignBooks)
+    const existing = s.chatStates[chatId] || {};
     s.chatStates[chatId] = {
         currentMemo:  s.currentMemo,
         memoHistory:  JSON.parse(JSON.stringify(s.memoHistory)),
@@ -357,6 +359,8 @@ export function saveChatState(chatId) {
         routerCampaignPrefix: s.routerCampaignPrefix || '',
         routerLookback: s.routerLookback || 3,
         routerDirectPrompt: s.routerDirectPrompt || '',
+        // Preserve lorebook stack link — written by Link button and router, not by normal state saves
+        campaignBooks: existing.campaignBooks || [],
     };
     SillyTavern.getContext().saveSettingsDebounced();
 }
