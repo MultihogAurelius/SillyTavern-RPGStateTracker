@@ -33,7 +33,13 @@
                             <i class="fa-solid fa-rotate"></i> Reset All &amp; Apply Main Sysprompt
                         </button>
 
-                        <div style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 10px;">
+                        <label class="checkbox_label" style="margin-top: 10px;">
+                            <input id="rpg_tracker_custom_sysprompt" type="checkbox" />
+                            <span>Custom Sysprompt Mode</span>
+                            <i class="fa-solid fa-circle-question interactable" title="When enabled, the framework will not touch your system prompt. Manage it yourself. All Narrator Configuration toggles are hidden."></i>
+                        </label>
+
+                        <div id="rpg_narrator_config_block" style="margin-top: 10px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px 10px;">
                             <small style="display: block; margin-bottom: 6px; font-weight: bold; opacity: 0.9;">Narrator Configuration</small>
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">
                                 <span style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">RNG</span>
@@ -52,7 +58,9 @@
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_quests" /><span>Enable Quests</span></label>
                                 <div id="rpg_quests_options" class="flex-container flexFlowColumn gap-1" style="padding-left: 20px; display: none;">
                                     <label class="checkbox_label"><input type="checkbox" id="rpg_quests_deadlines" /><span>Deadlines</span></label>
-                                    <label class="checkbox_label"><input type="checkbox" id="rpg_quests_frustration" /><span>Frustration</span></label>
+                                    <div id="rpg_quests_frustration_wrap" style="padding-left: 20px; display: none;">
+                                        <label class="checkbox_label"><input type="checkbox" id="rpg_quests_frustration" /><span style="opacity: 0.9;">↳ Frustration</span></label>
+                                    </div>
                                     <label class="checkbox_label"><input type="checkbox" id="rpg_quests_difficulty" /><span>Difficulty</span></label>
                                     <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
                                         <div style="font-size: 0.75em; opacity: 0.6; text-transform: uppercase; font-weight: bold;">
@@ -70,14 +78,16 @@
                                 </div>
                             </div>
 
-                            <div style="font-size: 0.85em; font-weight: bold; opacity: 0.8; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">Components</div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">
+                                <span style="font-size: 0.85em; font-weight: bold; opacity: 0.8;">Components</span>
+                                <button id="rt_components_help" style="background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: inherit; font-size: 0.72em; opacity: 0.7; padding: 1px 7px; cursor: pointer;">What are these?</button>
+                            </div>
                             <div class="flex-container flexFlowColumn gap-1" style="margin-bottom: 8px; padding-left: 5px;">
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_loot" /><span>🎲 Loot</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_random_events" /><span>🌍 Events</span></label>
                                 <label class="checkbox_label"><input type="checkbox" id="rpg_sysprompt_mod_resting" /><span>💤 Resting</span></label>
                             </div>
 
-                            <button id="rpg_tracker_btn_apply_sysprompt" class="menu_button interactable" style="width: 100%;"><i class="fa-solid fa-file-import"></i> Apply Sysprompt Now</button>
                         </div>
 
                         <label class="checkbox_label">
@@ -94,15 +104,21 @@
                             <option value="rt-theme-hacker">Hacker</option>
                             <option value="rt-theme-fantasy">Fantasy</option>
                             <option value="rt-theme-hologram">Hologram</option>
-                            <option value="rt-theme-azure">Azure Atoll</option>
+                            <option value="rt-theme-pacific">Pacific Cove</option>
+                            <option value="rt-theme-cherry">Cherry Blossom</option>
                             <option value="rt-theme-custom">✨ Custom (AI Wizard)</option>
                         </select>
                         <div class="flex-container flexFlowColumn gap-1" style="margin-top: 5px;">
                             <div class="flex-container alignitemscenter" style="width: 100%;">
-                                <span>Global Font Size</span>
+                                <span>Tracker Font Size</span>
                                 <span id="rpg_tracker_font_size_val" style="margin-left: auto; font-weight: bold; opacity: 0.8;">13px</span>
                             </div>
                             <input id="rpg_tracker_font_size" type="range" class="text_pole" style="width: 100%; cursor: pointer;" min="8" max="32" />
+                            <div class="flex-container alignitemscenter" style="width: 100%; margin-top: 4px;">
+                                <span>Agent Font Size</span>
+                                <span id="rpg_agent_font_size_val" style="margin-left: auto; font-weight: bold; opacity: 0.8;">13px</span>
+                            </div>
+                            <input id="rpg_agent_font_size" type="range" class="text_pole" style="width: 100%; cursor: pointer;" min="8" max="32" />
                         </div>
 
                         <div id="rpg_tracker_theme_wizard_block" style="display:none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.03);">

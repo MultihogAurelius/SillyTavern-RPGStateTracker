@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass, rollbackRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
+import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry } from './router.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -72,6 +72,8 @@ import { runRouterPass, rollbackRouterPass, getLorebookManifest, deleteLorebookE
         // Deadlines Sync
         const deadlines = /** @type {HTMLInputElement|null} */ (onboarding.querySelector('#rt_onboarding_quests_deadlines'));
         if (deadlines) deadlines.checked = !!s.syspromptModules?.questsDeadlines;
+        const frustrationWrapOnb = /** @type {HTMLElement|null} */ (onboarding.querySelector('#rt_onboarding_quests_frustration_wrap'));
+        if (frustrationWrapOnb) frustrationWrapOnb.style.display = deadlines?.checked ? '' : 'none';
 
         // Frustration levels Sync
         const frustration = /** @type {HTMLInputElement|null} */ (onboarding.querySelector('#rt_onboarding_quests_frustration'));
@@ -95,11 +97,54 @@ import { runRouterPass, rollbackRouterPass, getLorebookManifest, deleteLorebookE
             const cb = /** @type {HTMLInputElement|null} */ (onboarding.querySelector(id));
             if (cb) cb.checked = !!s.syspromptModules?.[key];
         }
+
+        // Custom Sysprompt Sync
+        const customSyspromptCb = /** @type {HTMLInputElement|null} */ (onboarding.querySelector('#rt_onboarding_custom_sysprompt'));
+        if (customSyspromptCb) customSyspromptCb.checked = !!s.customSysprompt;
     }
     // ── Renderer / navigation state ──
     let _historyViewIndex = -1;    // -1 = live, 0 = most recent snapshot, higher = older
     let _renderedViewActive = false;
     const _sectionPages = {};
+
+    // ── Lorebook Agent nav state ──
+    /** @type {Array<{prePassSnapshot: object, postPassState: object}>} */
+    let _loreRedoStack = [];  // in-memory; cleared when a new agent pass starts
+
+    /**
+     * Activates every lorebook that belongs to the current campaign in SillyTavern's
+     * world-info system (equivalent to toggling them ON in the World Info panel).
+     * Uses the full ST lorebook registry filtered by campaign prefix, so keyless
+     * lorebooks that never appear in activeRouterKeys are still caught.
+     * Returns the count of books activated.
+     */
+    async function activateCampaignBooks() {
+        const s = getSettings();
+        const ctx = SillyTavern.getContext();
+        if (typeof ctx.executeSlashCommandsWithOptions !== 'function') return 0;
+
+        const prefix = s.routerCampaignPrefix || '';
+
+        // Flush ST registry so freshly-written books are visible
+        if (typeof ctx.updateWorldInfoList === 'function') {
+            try { await ctx.updateWorldInfoList(); } catch (_) {}
+        }
+
+        // Get all known lorebook names then filter to this campaign
+        let allNames = [];
+        if (typeof ctx.getWorldInfoNames === 'function') {
+            try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
+        }
+
+        const bookNames = prefix
+            ? allNames.filter(n => n.startsWith(prefix))
+            : allNames;
+
+        for (const name of bookNames) {
+            await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`);
+        }
+        return bookNames.length;
+    }
 
 
 
@@ -305,6 +350,10 @@ import { runRouterPass, rollbackRouterPass, getLorebookManifest, deleteLorebookE
 
             updateUIMemo('');
             refreshRenderedView();
+        }
+
+        if (getSettings().routerAutoActivateBooks) {
+            activateCampaignBooks().catch(() => {});
         }
 
         updateChatLinkUI();
@@ -1371,6 +1420,26 @@ Rules:
      */
     async function showQuestsHardcoreExplanation() {
         const { Popup } = SillyTavern.getContext();
+        const card = (icon, title, body, sub = false) => `
+            <div style="background: rgba(255,255,255,${sub ? '0.03' : '0.05'}); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; text-align: left; ${sub ? 'margin-left: 16px;' : ''}">
+                <div style="font-size: 1em; font-weight: bold; margin-bottom: 6px;">${icon} ${title}</div>
+                <div style="font-size: 0.9em; line-height: 1.5; opacity: 0.88;">${body}</div>
+            </div>`;
+        const popupBody = `
+            <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px; text-align: left;">
+                ${card('⏳', 'Deadlines',
+                    `Adds time-sensitive constraints to quests. The system prompt instructs NPCs to attach deadlines to tasks they give you. If the deadline passes without turning in the quest, it auto-fails. Forces you to prioritise — you can't just accept every task and grind at your leisure.`
+                )}
+                ${card('🎭', 'Frustration', `Requires Deadlines. A sub-mode where quests <em>don't</em> auto-fail at the deadline. Instead, each quest giver has an NPC happiness level that starts high and quickly drops the longer you leave it past due. The rate of decline depends on the NPC's personality, which the model infers from their archetype and tone. You can still turn the quest in late — but the reception won't be warm.`, true)}
+                ${card('⚔️', 'Difficulty',
+                    `The model assigns an explicit difficulty rating to each quest (e.g. Easy / Hard / Deadly) rather than leaving it vague. Useful for planning and for AI consistency when calculating rewards or consequences.`
+                )}
+            </div>`;
+        await Popup.show.confirm('📋 Quest Mechanics Explained', popupBody, { okButton: 'Got it', cancelButton: false });
+    }
+
+    async function showComponentsExplanation() {
+        const { Popup } = SillyTavern.getContext();
         const card = (icon, title, body) => `
             <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; text-align: left;">
                 <div style="font-size: 1em; font-weight: bold; margin-bottom: 6px;">${icon} ${title}</div>
@@ -1378,15 +1447,17 @@ Rules:
             </div>`;
         const popupBody = `
             <div style="font-size: 0.9em; line-height: 1.5; max-width: 480px; text-align: left;">
-                ${card('⏳', 'Deadlines',
-                    `Deadlines add time-sensitive constraints to the State Tracker and modifies the system prompt to encourage NPCs to give deadlines. Quests will fail if the deadline is crossed. This makes time more of a factor with regard to quests. You can't simply take every task because you must manage that you can actually finish them. Also adds to immersion/realism.`
+                ${card('🎲', 'Loot',
+                    `When loot is received, dice rolls are made to determine its quality — whether something is a battered common item or a rare find. Adds meaningful variance to rewards.`
                 )}
-                ${card('🎭', 'Frustration Levels',
-                    `This is a highly experimental feature that adds a "frustration coefficient" to quest givers. This starts negative, meaning if you're actually very quick with finishing a quest, the NPC will be pleasantly surprised.<br><br>
-                    In this mode, quests don't actually fail if they go past their deadline; they just report "past deadline," which will cause the frustration of the quest giver to ramp up faster. You can still turn in the quest, but the reception probably won't be positive!`
+                ${card('🌍', 'Events',
+                    `Random events are rolled when time skips or travel occurs. A chance encounter, a weather shift, an ambush — things that happen without the player initiating them. Keeps the world feeling alive.`
+                )}
+                ${card('💤', 'Resting',
+                    `Resting is limited to once every 9 hours of in-game time. Prevents exploiting rest as a free heal between every fight, and reflects the reality that you can't just nap on demand.`
                 )}
             </div>`;
-        await Popup.show.confirm('📋 Quest Mechanics Explained', popupBody, { okButton: 'Got it', cancelButton: false });
+        await Popup.show.confirm('🧩 Components Explained', popupBody, { okButton: 'Got it', cancelButton: false });
     }
 
     function bindRenderedCardEvents(el, memo, isDetachedContext = false, onRefresh = null) {
@@ -1477,6 +1548,8 @@ Rules:
             if (questsCb) questsCb.checked = fresh.syspromptModules?.quests !== false;
             if (deadlinesCb) deadlinesCb.checked = !!fresh.syspromptModules?.questsDeadlines;
             if (frustrationCb) frustrationCb.checked = !!fresh.syspromptModules?.questsFrustration;
+            const frustrationWrapEl = /** @type {HTMLElement|null} */ (document.getElementById('rpg_quests_frustration_wrap'));
+            if (frustrationWrapEl) frustrationWrapEl.style.display = !!fresh.syspromptModules?.questsDeadlines ? '' : 'none';
             const difficultyCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_difficulty'));
             if (difficultyCb) difficultyCb.checked = !!fresh.syspromptModules?.questsDifficulty;
             if (qmStandard && qmLegacy) {
@@ -1490,6 +1563,12 @@ Rules:
                 const cb = /** @type {HTMLInputElement|null} */ (document.getElementById(id.replace('#','')));
                 if (cb) cb.checked = !!fresh.syspromptModules?.[key];
             }
+
+            // Custom Sysprompt
+            const customSyspromptEl = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
+            if (customSyspromptEl) customSyspromptEl.checked = !!fresh.customSysprompt;
+            const narratorBlockEl = document.getElementById('rpg_narrator_config_block');
+            if (narratorBlockEl) narratorBlockEl.style.display = !!fresh.customSysprompt ? 'none' : '';
 
             // Save and sync the onboarding view
             saveSettings();
@@ -1537,13 +1616,29 @@ Rules:
 
         // Deadlines Sync
         const onboardingDeadlinesCb = el.querySelector('#rt_onboarding_quests_deadlines');
+        const onboardingFrustrationWrap = el.querySelector('#rt_onboarding_quests_frustration_wrap');
+        const syncOnboardingFrustrationVisibility = () => {
+            if (onboardingFrustrationWrap) onboardingFrustrationWrap.style.display = onboardingDeadlinesCb?.checked ? '' : 'none';
+        };
         if (onboardingDeadlinesCb) {
             onboardingDeadlinesCb.checked = !!s.syspromptModules?.questsDeadlines;
+            syncOnboardingFrustrationVisibility();
             onboardingDeadlinesCb.addEventListener('change', () => {
-                syncSettingsAndUI(settings => {
-                    if (!settings.syspromptModules) settings.syspromptModules = {};
-                    settings.syspromptModules.questsDeadlines = !!onboardingDeadlinesCb.checked;
-                });
+                if (!onboardingDeadlinesCb.checked) {
+                    const fCb = el.querySelector('#rt_onboarding_quests_frustration');
+                    if (fCb) fCb.checked = false;
+                    syncSettingsAndUI(settings => {
+                        if (!settings.syspromptModules) settings.syspromptModules = {};
+                        settings.syspromptModules.questsDeadlines = false;
+                        settings.syspromptModules.questsFrustration = false;
+                    });
+                } else {
+                    syncSettingsAndUI(settings => {
+                        if (!settings.syspromptModules) settings.syspromptModules = {};
+                        settings.syspromptModules.questsDeadlines = true;
+                    });
+                }
+                syncOnboardingFrustrationVisibility();
             });
         }
 
@@ -1600,109 +1695,12 @@ Rules:
         syncOptionalMod('#rt_onboarding_mod_random_events', 'random_events');
         syncOptionalMod('#rt_onboarding_mod_resting', 'resting');
 
-        const onboardingApplyBtn = el.querySelector('#rt_onboarding_btn_apply_sysprompt');
-        if (onboardingApplyBtn) {
-            onboardingApplyBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                
-                const s = getSettings();
-
-                // ── CRITICAL: Sync all onboarding UI states to settings before building ──
-                // This ensures the "Apply" button respects what the user sees, even if
-                // event listeners were delayed or missed.
-                
-                // RNG Mode
-                const rngHybrid = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_rng_hybrid'));
-                if (rngHybrid) s.diceFunctionTool = !!rngHybrid.checked;
-
-                // Quests & Modules
-                const questsCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_quests_enabled'));
-                if (questsCb) {
-                    if (!s.syspromptModules) s.syspromptModules = {};
-                    s.syspromptModules.quests = !!questsCb.checked;
-                }
-                const deadlinesCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_quests_deadlines'));
-                if (deadlinesCb) {
-                    if (!s.syspromptModules) s.syspromptModules = {};
-                    s.syspromptModules.questsDeadlines = !!deadlinesCb.checked;
-                }
-                const frustrationCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_quests_frustration'));
-                if (frustrationCb) {
-                    if (!s.syspromptModules) s.syspromptModules = {};
-                    s.syspromptModules.questsFrustration = !!frustrationCb.checked;
-                }
-                const difficultyCb = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_quests_difficulty'));
-                if (difficultyCb) {
-                    if (!s.syspromptModules) s.syspromptModules = {};
-                    s.syspromptModules.questsDifficulty = !!difficultyCb.checked;
-                }
-                const qmLegacy = /** @type {HTMLInputElement|null} */ (el.querySelector('#rt_onboarding_quest_legacy'));
-                if (qmLegacy) s.questLegacyMode = !!qmLegacy.checked;
-
-                // Optional Modules
-                const modKeys = { '#rt_onboarding_mod_loot': 'loot', '#rt_onboarding_mod_random_events': 'random_events', '#rt_onboarding_mod_resting': 'resting' };
-                for (const [id, key] of Object.entries(modKeys)) {
-                    const cb = /** @type {HTMLInputElement|null} */ (el.querySelector(id));
-                    if (cb) {
-                        if (!s.syspromptModules) s.syspromptModules = {};
-                        s.syspromptModules[key] = !!cb.checked;
-                    }
-                }
-
-                // Run specific logic updates
-                if (s.questLegacyMode) {
-                    refreshQuestLegacyPrompt(s);
-                } else {
-                    if (!s.stockPrompts) s.stockPrompts = { ...DEFAULT_STOCK_PROMPTS };
-                    s.stockPrompts.quests = DEFAULT_STOCK_PROMPTS.quests;
-                    registerLogQuestTool();
-                }
-                refreshOrderList();
-                saveSettings();
-
-                // ── Proceed with Sysprompt construction ──
-                const fileName = s.diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
-                let content;
-                try {
-                    const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
-                    if (response.ok) {
-                        content = await response.text();
-                    } else {
-                        throw new Error(`Server returned ${response.status}`);
-                    }
-                } catch (err) {
-                    console.warn(`[Fatbody Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
-                    content = RT_PROMPTS[fileName];
-                }
-
-                if (!content) {
-                    toastr['error']('Could not load sysprompt.txt.', 'RPG Tracker');
-                    return;
-                }
-
-                content = buildSysprompt(content);
-
-                const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
-                if (mainTextarea) {
-                    mainTextarea.value = content;
-                    mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-                    toastr['success']('Narrator sysprompt applied! ✅', 'RPG Tracker');
-                } else {
-                    const ta = document.createElement('textarea');
-                    ta.value = content;
-                    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
-                    document.body.appendChild(ta);
-                    ta.focus();
-                    ta.select();
-                    try {
-                        document.execCommand('copy');
-                        toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard — paste it manually.', 'RPG Tracker');
-                    } catch (e) {
-                        toastr['warning']('Quick Prompt "Main" textarea not found and clipboard copy failed. Use the SYSPROMPT button to copy manually.', 'RPG Tracker');
-                    } finally {
-                        document.body.removeChild(ta);
-                    }
-                }
+        // Custom Sysprompt toggle (onboarding)
+        const onboardingCustomSyspromptCb = el.querySelector('#rt_onboarding_custom_sysprompt');
+        if (onboardingCustomSyspromptCb) {
+            onboardingCustomSyspromptCb.checked = !!getSettings().customSysprompt;
+            onboardingCustomSyspromptCb.addEventListener('change', () => {
+                syncSettingsAndUI(s => { s.customSysprompt = !!onboardingCustomSyspromptCb.checked; });
             });
         }
 
@@ -2038,78 +2036,78 @@ Rules:
                         <button class="rpg-tracker-icon-btn" id="rpg-tracker-agent-close" title="Close">✕</button>
                     </div>
                 </div>
-                <div class="rpg-tracker-content" style="flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; color: var(--rt-text);">
+                <div class="rpg-tracker-content" style="flex: 1; overflow-y: auto; padding: 10px; color: var(--rt-text);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                        <div style="font-weight: bold; opacity: 0.9; font-size: 12px; color: var(--rt-accent, #3498db);">AUTONOMOUS RESEARCHER</div>
-                        <button id="rt-agent-help-btn" style="background: var(--rt-accent-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 12px; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="What is the Lorebook Agent?">?</button>
+                        <div style="font-weight: bold; opacity: 0.9; font-size: 0.923em; color: var(--rt-accent, #3498db);">AUTONOMOUS RESEARCHER</div>
+                        <button id="rt-agent-help-btn" style="background: var(--rt-accent-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 12px; width: 20px; height: 20px; font-size: 0.846em; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="What is the Lorebook Agent?">?</button>
                     </div>
 
-                    <div style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); color: #ffa500; padding: 6px; border-radius: 4px; font-size: 10px; text-align: center; font-weight: bold; margin-bottom: 15px;">
+                    <div style="background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); color: #ffa500; padding: 6px; border-radius: 4px; font-size: 0.769em; text-align: center; font-weight: bold; margin-bottom: 15px;">
                         ⚠️ UNDER CONSTRUCTION, NEEDS TESTING
                     </div>
 
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 11px;" title="Enable the Lorebook Agent to automatically research and record world lore.">
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Enable the Lorebook Agent to automatically research and record world lore.">
                         Enable Lorebook Agent
                         <input type="checkbox" id="rt-agent-router-enable" ${settings.routerEnabled ? 'checked' : ''}>
                     </label>
 
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 11px;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; opacity: 0.8; font-size: 0.846em;" title="Use simple text tags [[NPC: Name | Desc]] instead of complex tools. Better for small models.">
                         Basic Mode (tag-based, no tool calls)
                         <input type="checkbox" id="rt-agent-router-basic" ${settings.routerBasicMode ? 'checked' : ''}>
                     </label>
 
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;" title="Main Lookback: How many recent messages the agent analyzes during automatic passes.">
-                        <span style="font-size: 10px; opacity: 0.7;">Main Lookback:</span>
-                        <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 10px; padding: 1px;">
-                        <span style="font-size: 10px; opacity: 0.5;">msgs</span>
+                        <span style="font-size: 0.769em; opacity: 0.7;">Main Lookback:</span>
+                        <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 3}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                        <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
                     </div>
 
                     <div style="display: flex; gap: 8px; margin-bottom: 10px;">
                         <div style="flex: 1;" title="Max Tokens: The maximum token limit for the agent's response. 0 = model default.">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Tokens:</div>
-                            <input type="number" id="rt-agent-router-max-tokens" value="${settings.routerMaxTokens || 0}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Tokens:</div>
+                            <input type="number" id="rt-agent-router-max-tokens" value="${settings.routerMaxTokens || 0}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;" title="Max Turns: How many Thought/Action loops the agent can perform before timing out (Advanced Mode only).">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Turns:</div>
-                            <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Turns:</div>
+                            <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;" title="Max Active: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Max Active:</div>
-                            <input type="number" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 5}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 11px; box-sizing: border-box;">
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Active:</div>
+                            <input type="number" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 5}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                     </div>
                     
-                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px; color: var(--rt-text-muted);">Direct Command:</div>
-                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 11px !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
+                    <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Direct Command:</div>
+                    <textarea id="rt-agent-router-direct-prompt" placeholder="Ask the agent to find or record something specific..." style="width: 100% !important; min-height: 60px !important; height: 60px !important; background: var(--rt-card-bg) !important; color: var(--rt-text) !important; border: var(--rt-border) !important; border-radius: 4px !important; padding: 6px !important; font-size: 0.846em !important; margin-bottom: 6px !important; resize: vertical !important; display: block !important; box-sizing: border-box !important; line-height: 1.3 !important;">${settings.routerDirectPrompt || ''}</textarea>
 
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
                         <div style="display: flex; align-items: center; gap: 6px;" title="Direct Lookback: How many recent messages to analyze for this specific command.">
-                            <span style="font-size: 10px; opacity: 0.7; color: var(--rt-text-muted);">Lookback:</span>
-                            <input type="number" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 10px; padding: 1px; box-sizing: border-box; height: 20px;">
-                            <span style="font-size: 10px; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
+                            <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback:</span>
+                            <input type="number" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
+                            <span style="font-size: 0.769em; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
                         </div>
-                        <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 10px; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
-                            <i class="fa-solid fa-paper-plane" style="font-size: 9px;"></i> RUN COMMAND
+                        <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 0.769em; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
+                            <i class="fa-solid fa-paper-plane" style="font-size: 0.692em;"></i> RUN COMMAND
                         </button>
                     </div>
 
 
                     <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
-                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Modular Repertoire (Prompt Rules)</summary>
+                        <summary style="cursor: pointer; font-size: 0.846em; font-weight: bold; opacity: 0.8; color: #aaa;">Modular Repertoire (Prompt Rules)</summary>
                         <div style="padding-top: 10px;">
-                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Enabled Modules (Stock):</div>
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Enabled Modules (Stock):</div>
                             <div id="rt-agent-stock-modules-list" style="margin-bottom: 10px;"></div>
 
-                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Custom Tags (Basic Mode):</div>
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Custom Tags (Basic Mode):</div>
                             <div id="rt-agent-custom-tags-list"></div>
-                            <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 10px; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px;">+ Add Custom Tag</button>
+                            <button id="rt-agent-add-custom-tag" style="width: 100%; background: #333; border: 1px solid #444; color: #ddd; font-size: 0.769em; padding: 2px; border-radius: 3px; cursor: pointer; margin-top: 4px;">+ Add Custom Tag</button>
                         </div>
                     </details>
 
                     <details style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
-                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Lorebook Agent Connection</summary>
+                        <summary style="cursor: pointer; font-size: 0.846em; font-weight: bold; opacity: 0.8; color: #aaa;">Lorebook Agent Connection</summary>
                         <div style="padding-top: 10px;">
-                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 11px;">Connection Source:</div>
+                            <div style="margin-bottom: 5px; font-weight: bold; opacity: 0.8; font-size: 0.846em;">Connection Source:</div>
                             <select id="rt-agent-router-source" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
                                 <option value="default" ${settings.routerConnectionSource === 'default' ? 'selected' : ''}>Main API</option>
                                 <option value="profile" ${settings.routerConnectionSource === 'profile' ? 'selected' : ''}>SillyTavern Profile</option>
@@ -2145,7 +2143,7 @@ Rules:
                                 <input type="text" id="rt-agent-router-openai-model-manual" placeholder="Or type model name manually" value="${settings.routerOpenaiModel || ''}" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
                             </div>
 
-                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 11px;">Generation Preset:</div>
+                            <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em;">Generation Preset:</div>
                             <select id="rt-agent-router-preset" style="width: 100%; margin-bottom: 5px; background: #222; color: #ddd; border: 1px solid #444; border-radius: 3px; padding: 2px;">
                                 <option value="">-- Use Current Settings --</option>
                             </select>
@@ -2153,8 +2151,8 @@ Rules:
                     </details>
 
                     <details style="margin-top: 15px; border-top: 1px solid #444; padding-top: 10px;">
-                        <summary style="cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8; color: #aaa;">Debug: Last Request Context</summary>
-                        <div id="rt-agent-debug-drawer" style="font-family: monospace; font-size: 10px; background: rgba(0,0,0,0.5); padding: 5px; margin-top: 5px; border-radius: 4px; color: #0f0; max-height: 200px; overflow-y: auto;">
+                        <summary style="cursor: pointer; font-size: 0.846em; font-weight: bold; opacity: 0.8; color: #aaa;">Debug: Last Request Context</summary>
+                        <div id="rt-agent-debug-drawer" style="font-family: monospace; font-size: 0.769em; background: rgba(0,0,0,0.5); padding: 5px; margin-top: 5px; border-radius: 4px; color: #0f0; max-height: 200px; overflow-y: auto;">
                             No request sent yet.
                         </div>
                     </details>
@@ -2162,49 +2160,60 @@ Rules:
 
                     <hr style="border-color: #333; margin: 10px 0;">
 
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">Active Lore Keys:</div>
-                            <button id="rt-agent-keys-refresh" title="Refresh active keys from disk" style="background: none; border: none; color: var(--rt-accent); font-size: 10px; cursor: pointer; opacity: 0.6; padding: 0;" ><i class="fa-solid fa-arrows-rotate"></i></button>
-                        </div>
-                        <button id="rt-agent-router-undo" title="Undo last agent pass" style="background: rgba(255,100,100,0.1); border: 1px solid rgba(255,100,100,0.25); color: #ff8888; font-size: 10px; border-radius: 4px; padding: 2px 8px; cursor: pointer; opacity: 0.8; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-rotate-left"></i> <span id="rt-agent-undo-label">Undo</span></button>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Active Lore Keys:</div>
+                        <button id="rt-agent-keys-refresh" title="Refresh active keys from disk" style="background: none; border: none; color: var(--rt-accent); font-size: 0.769em; cursor: pointer; opacity: 0.6; padding: 0;" ><i class="fa-solid fa-arrows-rotate"></i></button>
                     </div>
                     <div id="rt-agent-router-active-keys" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px;">
                     </div>
                     <hr style="border-color: #333; margin: 10px 0;">
                     
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">Lorebook Terminal:</div>
-                        <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 9px; cursor: pointer; opacity: 0.7;">Clear</button>
+                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Lorebook Terminal:</div>
+                        <button id="rt-agent-router-terminal-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
                     </div>
                     <div id="rt-agent-router-terminal" style="background: var(--rt-card-bg); border: var(--rt-border); border-radius: 4px; padding: 8px; min-height: 80px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; font-family: var(--rt-font-mono);">
-                        <div style="opacity: 0.4; font-size: 10px; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
+                        <div style="opacity: 0.4; font-size: 0.769em; font-style: italic; color: var(--rt-text-muted);">Waiting for agent activity...</div>
                     </div>
 
                     <hr style="border-color: rgba(255,255,255,0.05); margin: 10px 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">Agent Log History:</div>
-                        <button id="rt-agent-router-log-clear" style="background: transparent; border: none; color: #ff5555; font-size: 9px; cursor: pointer; opacity: 0.7;">Clear</button>
+                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Agent Log History:</div>
+                        <button id="rt-agent-router-log-clear" style="background: transparent; border: none; color: #ff5555; font-size: 0.692em; cursor: pointer; opacity: 0.7;">Clear</button>
                     </div>
                     <div id="rt-agent-router-log" style="display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; max-height: 150px; overflow-y: auto;">
                     </div>
 
                     <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                            <div style="font-weight: bold; opacity: 0.8; font-size: 11px;">CAMPAIGN RECORDS</div>
-                            <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 10px; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
+                            <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">CAMPAIGN RECORDS</div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="display:flex; align-items:center; gap:3px; font-size:9px; opacity:0.55; cursor:pointer; margin:0; user-select:none;" title="Automatically re-activate campaign lorebooks in SillyTavern when switching chats">
+                                    <input type="checkbox" id="rt-agent-auto-activate" style="margin:0; cursor:pointer; width:10px; height:10px;">
+                                    <span>Auto-link</span>
+                                </label>
+                                <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-activate" title="Activate all campaign lorebooks in SillyTavern now" style="font-size: 0.769em; opacity: 0.6; color: var(--rt-accent);"><i class="fa-solid fa-bolt"></i></button>
+                                <button class="rpg-tracker-icon-btn" id="rt-agent-manifest-refresh" title="Refresh Manifest" style="font-size: 0.769em; opacity: 0.5;"><i class="fa-solid fa-arrows-rotate"></i></button>
+                            </div>
                         </div>
                         <div id="rt-agent-manifest-list" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-                            <div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">Click refresh to load lore...</div>
+                            <div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Click refresh to load lore...</div>
                         </div>
+                    </div>
+                </div>
+                <div class="rpg-tracker-footer" id="rt-agent-footer">
+                    <div class="rpg-tracker-nav">
+                        <button class="rpg-tracker-nav-btn" id="rt-agent-nav-back" title="Undo last lorebook pass">←</button>
+                        <span class="rpg-tracker-nav-label" id="rt-agent-nav-label">[ LIVE ]</span>
+                        <button class="rpg-tracker-nav-btn" id="rt-agent-nav-fwd" title="Redo lorebook pass">→</button>
                     </div>
                 </div>
             </div>
             <div class="rpg-tracker-prompt-bar" id="rpg-tracker-prompt-bar" style="display:none;">
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
                 <div style="display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: flex-end;">
-                    <div class="rt-prompt-ctx-control" style="font-size: 9px; display: flex; flex-direction: column; align-items: center; gap: 0;" title="Context: number of recent messages to include">
-                        <input type="number" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50" style="width: 28px; height: 16px; font-size: 9px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
+                    <div class="rt-prompt-ctx-control" style="font-size: 0.692em; display: flex; flex-direction: column; align-items: center; gap: 0;" title="Context: number of recent messages to include">
+                        <input type="number" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50" style="width: 28px; height: 16px; font-size: 0.692em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
                         <span style="opacity: 0.5; font-size: 8px; line-height: 1;">msg</span>
                     </div>
                     <button class="rpg-tracker-prompt-send" id="rpg-tracker-prompt-send" title="Send instruction">▶</button>
@@ -2222,10 +2231,10 @@ Rules:
                 <div class="flex-container gap-1 alignitemscenter rt-rng-footer-group" style="display:none;">
                     <!-- Removed inline RNG toggles, now located in extension settings -->
                 </div>
-                <div id="rt-footer-location" style="font-size: 10px; color: var(--rt-accent); flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; cursor: help;" title="Current Location (Main, Sub)"></div>
+                <div id="rt-footer-location" style="font-size: 0.769em; color: var(--rt-accent); flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; cursor: help;" title="Current Location (Main, Sub)"></div>
                 <div class="flex-container gap-1 alignitemscenter rt-utility-footer-group">
                     <span id="rpg-tracker-count">~${Math.round(settings.currentMemo.length / 2.62)} tokens</span>
-                    <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 9px; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
+                    <button class="rpg-tracker-nav-btn" id="rpg-tracker-memo-clear" style="padding: 1px 5px; font-size: 0.692em; opacity: 0.8; margin-left: 5px;" title="Clear memo and history">CLEAR</button>
                 </div>
             </div>
         `;
@@ -2365,6 +2374,7 @@ Rules:
         // ── Router Agent UI ──
         const agentBtn = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent-btn'));
         const agentPanel = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent'));
+        agentPanel.style.setProperty('--rt-base-size', (settings.agentFontSize || 13) + 'px');
         const agentCloseBtn = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-agent-close'));
         
         renderRouterUI = async function() {
@@ -2400,7 +2410,7 @@ Rules:
                     title = `[${bookName}] ${entry.key?.join(', ')}\n\n${(entry.content || '').substring(0, 500)}${entry.content?.length > 500 ? '...' : ''}`;
                 }
 
-                return `<span class="rt-router-pill" style="background: rgba(42, 42, 53, 0.8); padding: 2px 8px; border-radius: 12px; font-size: 10px; border: 1px solid rgba(255,255,255,0.1); display: inline-flex; align-items: center; gap: 6px; cursor: help; max-width: 120px;" title="${escapeHtml(title)}">
+                return `<span class="rt-router-pill" style="background: rgba(42, 42, 53, 0.8); padding: 2px 8px; border-radius: 12px; font-size: 0.769em; border: 1px solid rgba(255,255,255,0.1); display: inline-flex; align-items: center; gap: 6px; cursor: help; max-width: 120px;" title="${escapeHtml(title)}">
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${escapeHtml(label)}</span>
                     <span class="rt-router-kill-key" data-key="${k}" style="cursor:pointer; color: #ff5555; font-weight: bold; padding: 0 2px;" title="Deactivate">✕</span>
                 </span>`;
@@ -2412,7 +2422,7 @@ Rules:
                 if (entry.deactivate?.length) diffStr += `<span style="color:#ff5555;">-${entry.deactivate.length}</span> `;
                 if (entry.record?.length) diffStr += `<span style="color:#55ccff;" title="Created: ${entry.record.join(', ')}">*${entry.record.length}</span> `;
                 if (entry.delete?.length) diffStr += `<span style="color:#ff3333; font-weight: bold;" title="Deleted: ${entry.delete.join(', ')}">✕${entry.delete.length}</span> `;
-                return `<div style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px; font-size: 10px; margin-bottom: 4px; border-left: 2px solid rgba(255,255,255,0.05);">
+                return `<div style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px; font-size: 0.769em; margin-bottom: 4px; border-left: 2px solid rgba(255,255,255,0.05);">
                     <div style="display:flex; justify-content: space-between; opacity: 0.7; margin-bottom: 2px; font-weight: bold;">
                         <span>${entry.time}</span>
                         <span>${diffStr}</span>
@@ -2436,12 +2446,16 @@ Rules:
             });
         }
         
+        // Assigned below when the agent panel is wired. Declared here so
+        // nav handlers outside the wiring block can always call it safely.
+        let refreshManifest = async (_source = 'uninitialized') => {};
+
         if (agentBtn && agentPanel && agentCloseBtn) {
             agentBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isHidden = (/** @type {HTMLElement} */ (agentPanel)).style.display === 'none';
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = isHidden ? 'flex' : 'none';
-                if (isHidden) renderRouterUI();
+                if (isHidden) { renderRouterUI(); refreshManifest(); }
             });
             agentCloseBtn.addEventListener('click', () => {
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
@@ -2450,27 +2464,44 @@ Rules:
             if (helpBtn) {
                 helpBtn.addEventListener('click', () => {
                     const content = `
-                        <div style="text-align: left; font-size: 14px; line-height: 1.4;">
+                        <div style="text-align: left; font-size: 13px; line-height: 1.5;">
                             <h3 style="margin-top: 0; color: var(--rt-custom-accent, #3498db);">The Lorebook Agent</h3>
-                            <p>The Lorebook Agent is an autonomous narrative researcher. It scans your chat history to ensure your Lorebook stays updated with new NPCs, locations, and world events without you having to lift a finger.</p>
-                            
-                            <h4 style="margin-bottom: 5px;">🤖 Memory Modes</h4>
+                            <p>An autonomous narrative researcher. After each generation it scans your recent chat, decides what has changed, and writes new or updated entries directly into your SillyTavern lorebooks — no manual data entry needed.</p>
+
+                            <h4 style="margin-bottom: 5px;">🤖 Operating Modes</h4>
                             <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Basic Mode (Tags)</b>: Uses simple text tags like <code>[[NPC: Name | Desc]]</code>. Perfect for smaller models (Mistral Small, Gemma 4, smaller Qwen models, etc, local stuff).</li>
-                                <li><b>Advanced Mode (Tools)</b>: Uses a complex ReAct loop (Thought/Action/Observation). Best for large models like <b>Claude Sonnet</b> or <b>GPT-5</b>, though some smaller models can work quite well! (e.g. Qwen 3.6 running on mid-range hardware like an RTX 5060 Ti).</li>
+                                <li><b>Basic Mode (Tags)</b> — The model outputs structured tags the Agent parses directly:<br>
+                                    <code style="font-size:11px;">[[NPC: Name | Description | keyword1, keyword2]]</code><br>
+                                    Supported types: <code>NPC</code>, <code>LOC</code>, <code>FAC</code>, <code>QUEST</code>, <code>EVENT</code>, plus <code>[[ACTIVATE: name]]</code>, <code>[[DEACTIVATE: name]]</code>, <code>[[DELETE: name]]</code>.<br>
+                                    Ideal for smaller/local models (Mistral Small, Gemma, Qwen, etc.).</li>
+                                <li style="margin-top:8px;"><b>Advanced Mode (Tools)</b> — Multi-turn ReAct loop: the model reasons (<i>Thought</i>), calls a tool (<i>Action</i>), receives a result (<i>Observation</i>), and repeats until it calls <code>finish</code> or hits Max Turns. Tools include <code>record</code>, <code>update</code>, <code>activate</code>, <code>deactivate</code>, <code>delete</code>, and <code>search</code>. Best for larger models (Claude Sonnet, GPT-5); maybe even Qwen 3 can handle it on capable hardware.</li>
                             </ul>
 
                             <h4 style="margin-bottom: 5px;">🧠 Attention-Based Memory</h4>
-                            <p>To save tokens, the Agent only has "Full Vision" of <b>Active</b> entries. Everything else is stored in the <b>Archive</b> (visible only as a name/keyword index). The Agent must use <code>[[ACTIVATE]]</code> to read or update an archived entry.</p>
+                            <p>The Agent sees two tiers of lorebook content:</p>
+                            <ul style="padding-left: 20px; margin-top: 0;">
+                                <li><b>Active entries</b> — full content is visible in the Agent's context. Keyword-triggered by SillyTavern and managed via <b>Active Lore Keys</b>.</li>
+                                <li><b>Inactive entries</b> — listed only by name and keywords (no content). The Agent must activate them first to read or update their body.</li>
+                            </ul>
+                            <p style="margin-top:4px;"><b>Max Active</b> caps how many entries can be active simultaneously (FIFO pruning keeps token cost predictable).</p>
+
+                            <h4 style="margin-bottom: 5px;">📂 Campaign Records</h4>
+                            <p>All lorebooks created by the Agent for the current campaign are shown grouped by book. Click any folder to expand it; click any entry to read its full content. The <b>⚡ button</b> re-activates all campaign lorebooks in SillyTavern instantly. Enable <b>Auto-link</b> to do this automatically whenever you switch chats.</p>
+
+                            <h4 style="margin-bottom: 5px;">↩ History Navigation</h4>
+                            <p>The <b>← [ LIVE ] →</b> bar at the bottom lets you step back through lorebook snapshots and redo steps you've undone — just like the State Tracker's memo history. Each agent pass is snapshotted before it runs (up to 5 saved). A new pass clears the redo stack.</p>
 
                             <h4 style="margin-bottom: 5px;">🛠️ Modular Repertoire</h4>
-                            <p>You can toggle which entity types the Agent tracks (NPCs, Quests, etc.) and even add <b>Custom Tags</b>. Every module's instructions can be edited to control how the AI records data.</p>
+                            <p>Toggle which entity types the Agent tracks (NPCs, Locations, Factions, Quests, Events) and add <b>Custom Tags</b> for anything world-specific. Every module's system prompt snippet is editable so you control exactly how the AI records data.</p>
 
-                            <h4 style="margin-bottom: 5px;">🕹️ Universal Controls</h4>
+                            <h4 style="margin-bottom: 5px;">🕹️ Controls Reference</h4>
                             <ul style="padding-left: 20px; margin-top: 0;">
-                                <li><b>Main Lookback</b>: How far the agent looks back during automatic turns.</li>
-                                <li><b>Direct Command</b>: Ask the agent specific questions like <i>"Summarize the history of this city"</i>.</li>
-                                <li><b>Max Active</b>: Limits how many entities stay in "Full Vision" to prevent token bloat.</li>
+                                <li><b>Main Lookback</b>: Messages the Agent scans during automatic post-generation runs.</li>
+                                <li><b>Max Tokens</b>: Caps the Agent's response length per turn.</li>
+                                <li><b>Max Turns</b>: Maximum ReAct loop iterations before the Agent is forced to finish (Advanced Mode).</li>
+                                <li><b>Max Active</b>: Maximum simultaneously active lore entries.</li>
+                                <li><b>Campaign Prefix</b>: Namespace for all lorebooks this Agent creates (e.g. <i>Eldoria</i> → <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>…).</li>
+                                <li><b>Direct Command</b>: Runs a one-off agent pass with a custom instruction and its own lookback window — useful for targeted research or corrections.</li>
                             </ul>
                         </div>
                     `;
@@ -2497,71 +2528,155 @@ Rules:
                 });
             }
 
-            const refreshManifest = async () => {
+            // Tracks which lorebook folders are open across refreshes
+            const _manifestOpenFolders = new Set();
+
+            refreshManifest = async () => {
                 const list = agentPanel.querySelector('#rt-agent-manifest-list');
                 if (!list) return;
-                
-                list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">Loading...</div>';
-                
+
+                list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">Loading...</div>';
+
                 try {
                     const manifest = await getLorebookManifest();
                     if (!manifest.length) {
-                        list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 10px; padding: 10px;">No records found.</div>';
+                        list.innerHTML = '<div style="text-align: center; opacity: 0.5; font-size: 0.769em; padding: 10px;">No records found.</div>';
                         return;
                     }
-                    
+
+                    const s = getSettings();
+                    const prefix = s.routerCampaignPrefix || '';
+
+                    // Group entries by lorebook
+                    /** @type {Map<string, typeof manifest>} */
+                    const byBook = new Map();
+                    for (const item of manifest) {
+                        if (!byBook.has(item.book)) byBook.set(item.book, []);
+                        byBook.get(item.book).push(item);
+                    }
+
                     list.innerHTML = '';
-                    manifest.forEach(item => {
-                        const card = document.createElement('div');
-                        card.className = 'rt-section-card';
-                        card.style.cssText = `
-                            padding: 6px;
-                            font-size: 11px;
-                            position: relative;
+
+                    for (const [bookName, items] of byBook) {
+                        // Strip campaign prefix from display name: "Eldoria_Factions" → "Factions"
+                        const displayName = prefix && bookName.startsWith(prefix + '_')
+                            ? bookName.slice(prefix.length + 1)
+                            : bookName;
+
+                        const activeCount = items.filter(i => i.is_active).length;
+                        const isOpen = _manifestOpenFolders.has(bookName);
+
+                        const folder = document.createElement('div');
+                        folder.style.cssText = 'flex-shrink: 0; margin-bottom: 2px;';
+
+                        const folderHdr = document.createElement('div');
+                        folderHdr.style.cssText = 'display:flex; align-items:center; gap:6px; padding:5px 6px; cursor:pointer; border-radius:4px; background:rgba(255,255,255,0.04);';
+                        folderHdr.innerHTML = `
+                            <span class="rt-mf-icon" style="font-size:9px; opacity:0.5; width:10px; flex-shrink:0; font-family:monospace;">${isOpen ? '▼' : '▶'}</span>
+                            <span style="font-weight:bold; font-size:11px; flex:1; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</span>
+                            <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length}</span>
                         `;
-                        
-                        const statusColor = item.is_active ? 'var(--rt-accent)' : 'var(--rt-text-muted)';
-                        const statusTitle = item.is_active ? 'Active (Visible to Agent)' : 'Archived (Hidden from Agent)';
-                        
-                        card.innerHTML = `
-                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                                <div style="width: 6px; height: 6px; border-radius: 50%; background: ${statusColor}; box-shadow: 0 0 4px ${statusColor};" title="${statusTitle}"></div>
-                                <div style="font-weight: bold; color: var(--rt-text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--rt-font);">${escapeHtml(item.label)}</div>
-                                <button class="rt-agent-entry-delete" data-id="${item.id}" style="background: none; border: none; color: var(--rt-text-muted); cursor: pointer; font-size: 10px; padding: 2px;" title="Delete Entry"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                            <div style="font-size: 9px; opacity: 0.5; margin-bottom: 4px; color: var(--rt-text-muted); font-family: var(--rt-font-mono);">[${item.keys.join(', ')}]</div>
-                            <div style="font-size: 10px; opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--rt-text);">${escapeHtml(item.content)}</div>
-                        `;
-                        
-                        card.querySelector('.rt-agent-entry-delete').addEventListener('click', async (e) => {
-                            e.stopPropagation();
-                            if (confirm(`Delete lore entry "${item.label}"?`)) {
-                                const success = await deleteLorebookEntry(item.id);
-                                if (success) {
-                                    refreshManifest();
-                                    // @ts-ignore
-                                    toastr.success(`Deleted ${item.label}`, 'Lorebook Agent');
-                                }
-                            }
+
+                        const folderBody = document.createElement('div');
+                        folderBody.style.cssText = `display:${isOpen ? 'flex' : 'none'}; flex-direction:column; border-left:1px solid rgba(255,255,255,0.07); margin-left:10px; padding-left:6px; gap:1px; padding-top:3px; padding-bottom:3px;`;
+
+                        folderHdr.addEventListener('click', () => {
+                            const opening = folderBody.style.display === 'none';
+                            folderBody.style.display = opening ? 'flex' : 'none';
+                            folderHdr.querySelector('.rt-mf-icon').textContent = opening ? '▼' : '▶';
+                            if (opening) _manifestOpenFolders.add(bookName);
+                            else _manifestOpenFolders.delete(bookName);
                         });
-                        
-                        list.appendChild(card);
-                    });
+
+                        for (const item of items) {
+                            const statusColor = item.is_active ? 'var(--rt-accent)' : 'rgba(255,255,255,0.18)';
+
+                            const entryEl = document.createElement('div');
+                            entryEl.style.cssText = 'flex-shrink:0; border-radius:3px;';
+
+                            const entryHdr = document.createElement('div');
+                            entryHdr.style.cssText = 'display:flex; align-items:center; gap:5px; padding:3px 4px; cursor:pointer; border-radius:3px;';
+                            entryHdr.innerHTML = `
+                                <div style="width:5px; height:5px; border-radius:50%; background:${statusColor}; flex-shrink:0;" title="${item.is_active ? 'Active (visible to agent)' : 'Inactive'}"></div>
+                                <span style="flex:1; font-size:10px; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.label)}</span>
+                                <button class="rt-agent-entry-delete" data-id="${item.id}" style="background:none; border:none; color:var(--rt-text-muted); cursor:pointer; font-size:9px; padding:1px 3px; opacity:0; flex-shrink:0;" title="Delete entry"><i class="fa-solid fa-trash"></i></button>
+                            `;
+
+                            const entryBody = document.createElement('div');
+                            entryBody.style.cssText = 'display:none; padding:4px 4px 6px 12px; flex-direction:column; gap:4px;';
+                            entryBody.innerHTML = `
+                                <div style="font-size:9px; opacity:0.5; color:var(--rt-text-muted); font-family:var(--rt-font-mono);">[${escapeHtml(item.keys.join(', '))}]</div>
+                                <div style="font-size:10px; opacity:0.85; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word;">${escapeHtml(item.content)}</div>
+                            `;
+
+                            // Show delete button on hover
+                            const delBtn = /** @type {HTMLButtonElement} */ (entryHdr.querySelector('.rt-agent-entry-delete'));
+                            entryHdr.addEventListener('mouseenter', () => { delBtn.style.opacity = '0.5'; });
+                            entryHdr.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
+
+                            // Toggle entry body on click (but not on delete)
+                            entryHdr.addEventListener('click', (e) => {
+                                if (/** @type {HTMLElement} */ (e.target).closest('.rt-agent-entry-delete')) return;
+                                const opening = entryBody.style.display === 'none';
+                                entryBody.style.display = opening ? 'flex' : 'none';
+                                entryHdr.style.background = opening ? 'rgba(255,255,255,0.05)' : '';
+                            });
+
+                            delBtn.addEventListener('click', async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete lore entry "${item.label}"?`)) {
+                                    const ok = await deleteLorebookEntry(item.id);
+                                    if (ok) {
+                                        refreshManifest();
+                                        // @ts-ignore
+                                        toastr.success(`Deleted "${item.label}"`, 'Lorebook Agent');
+                                    }
+                                }
+                            });
+
+                            entryEl.appendChild(entryHdr);
+                            entryEl.appendChild(entryBody);
+                            folderBody.appendChild(entryEl);
+                        }
+
+                        folder.appendChild(folderHdr);
+                        folder.appendChild(folderBody);
+                        list.appendChild(folder);
+                    }
                 } catch (e) {
-                    list.innerHTML = '<div style="text-align: center; color: #ff5555; font-size: 10px; padding: 10px;">Error loading manifest.</div>';
+                    list.innerHTML = '<div style="text-align: center; color: #ff5555; font-size: 0.769em; padding: 10px;">Error loading manifest.</div>';
                 }
             };
 
             const refreshBtn = agentPanel.querySelector('#rt-agent-manifest-refresh');
             if (refreshBtn) refreshBtn.addEventListener('click', refreshManifest);
 
-            // Auto-refresh manifest when agent finishes a pass or updates happen
-            document.addEventListener('rt_lore_agent_step', (e) => {
-                // @ts-ignore
-                if (e.detail?.type === 'end' || e.detail?.type === 'commit') {
-                    refreshManifest();
-                }
-            });
+            // ⚡ Manual "Activate All Books" button
+            const activateBtn = agentPanel.querySelector('#rt-agent-manifest-activate');
+            if (activateBtn) {
+                activateBtn.addEventListener('click', async () => {
+                    activateBtn.querySelector('i')?.classList.add('fa-spin');
+                    const count = await activateCampaignBooks();
+                    activateBtn.querySelector('i')?.classList.remove('fa-spin');
+                    // @ts-ignore
+                    count > 0
+                        ? toastr.success(`Activated ${count} lorebook${count > 1 ? 's' : ''}.`, 'Campaign Records')
+                        : toastr.info('No campaign lorebooks found to activate.', 'Campaign Records');
+                });
+            }
+
+            // Auto-link toggle
+            const autoActivateCheck = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-agent-auto-activate'));
+            if (autoActivateCheck) {
+                autoActivateCheck.checked = !!getSettings().routerAutoActivateBooks;
+                autoActivateCheck.addEventListener('change', () => {
+                    getSettings().routerAutoActivateBooks = autoActivateCheck.checked;
+                    saveSettings();
+                });
+            }
+
+            // Initial load so the list is populated without needing a manual click
+            refreshManifest();
 
             const renderAgentModules = () => {
                 const s = getSettings();
@@ -2575,10 +2690,10 @@ Rules:
                         <input type="checkbox" class="rt-agent-module-check" data-id="${id}" ${config.enabled ? 'checked' : ''} style="cursor: pointer; margin: 0;">
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div style="font-size: 10px; font-weight: bold; opacity: 0.7;">${config.tag}</div>
-                                <button class="rt-agent-module-reset" data-id="${id}" style="background: transparent; border: none; color: var(--rt-accent); cursor: pointer; font-size: 10px; padding: 0 4px; opacity: 0.6; height: 14px;" title="Reset to Default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                                <div style="font-size: 0.769em; font-weight: bold; opacity: 0.7;">${config.tag}</div>
+                                <button class="rt-agent-module-reset" data-id="${id}" style="background: transparent; border: none; color: var(--rt-accent); cursor: pointer; font-size: 0.769em; padding: 0 4px; opacity: 0.6; height: 14px;" title="Reset to Default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                             </div>
-                            <input type="text" value="${escapeHtml(config.instruction)}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--rt-text); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 10px; padding: 2px 4px; box-sizing: border-box;">
+                            <input type="text" value="${escapeHtml(config.instruction)}" class="rt-agent-module-inst" data-id="${id}" style="width: 100%; background: rgba(0,0,0,0.3); color: var(--rt-text); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; font-size: 0.769em; padding: 2px 4px; box-sizing: border-box;">
                         </div>
                     `;
                     list.appendChild(row);
@@ -2629,9 +2744,9 @@ Rules:
                     const row = document.createElement('div');
                     row.style.cssText = 'display: flex; gap: 2px; margin-bottom: 2px; align-items: center;';
                     row.innerHTML = `
-                        <input type="text" value="${tag.tag}" class="rt-custom-tag-name" data-idx="${idx}" placeholder="TAG" style="width: 60px; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
-                        <input type="text" value="${tag.instruction}" class="rt-custom-tag-inst" data-idx="${idx}" placeholder="Instructions..." style="flex: 1; background: #111; color: #ddd; border: 1px solid #333; font-size: 10px; padding: 1px;">
-                        <button class="rt-custom-tag-del" data-idx="${idx}" style="background: #422; color: #f99; border: none; font-size: 10px; cursor: pointer; padding: 1px 4px;">✕</button>
+                        <input type="text" value="${tag.tag}" class="rt-custom-tag-name" data-idx="${idx}" placeholder="TAG" style="width: 60px; background: #111; color: #ddd; border: 1px solid #333; font-size: 0.769em; padding: 1px;">
+                        <input type="text" value="${tag.instruction}" class="rt-custom-tag-inst" data-idx="${idx}" placeholder="Instructions..." style="flex: 1; background: #111; color: #ddd; border: 1px solid #333; font-size: 0.769em; padding: 1px;">
+                        <button class="rt-custom-tag-del" data-idx="${idx}" style="background: #422; color: #f99; border: none; font-size: 0.769em; cursor: pointer; padding: 1px 4px;">✕</button>
                     `;
                     list.appendChild(row);
                 });
@@ -2800,15 +2915,19 @@ Rules:
             const GEO_KEY = 'rpg_tracker_geometry_lorebook_agent';
             const isDetached = () => localStorage.getItem(DETACHED_AGENT_KEY) === 'true';
 
+            /** @type {(() => void) | null} */
+            let destroyAgentDraggable = null;
+
             const applyDetachedState = () => {
                 if (isDetached()) {
                     agentPanel.classList.add('rt-detached-panel');
                     agentPanel.style.display = 'flex'; // Force visibility if detached
                     document.body.appendChild(agentPanel);
                     renderRouterUI(); // Ensure it's populated
+                    refreshManifest();
                     const header = agentPanel.querySelector('.rpg-tracker-header');
                     if (header instanceof HTMLElement) {
-                        makeDraggable(agentPanel, header, GEO_KEY);
+                        destroyAgentDraggable = makeDraggable(agentPanel, header, GEO_KEY);
                     }
                     detachBtn.innerHTML = '↓';
                     detachBtn.title = 'Re-attach Lorebook Agent';
@@ -2850,9 +2969,13 @@ Rules:
                         agentPanel.style.width = '300px';
                     }
                 } else {
+                    if (destroyAgentDraggable) {
+                        destroyAgentDraggable();
+                        destroyAgentDraggable = null;
+                    }
                     agentPanel.classList.remove('rt-detached-panel');
                     panel.appendChild(agentPanel);
-                    agentPanel.style.left = ''; agentPanel.style.top = ''; agentPanel.style.right = '0';
+                    agentPanel.style.left = ''; agentPanel.style.top = '30px'; agentPanel.style.right = '0';
                     agentPanel.style.width = '300px'; agentPanel.style.height = '';
                     detachBtn.innerHTML = '⧉';
                     detachBtn.title = 'Detach Lorebook Agent';
@@ -3013,35 +3136,114 @@ Rules:
             }
         }
         
-        // ── Lorebook Undo Button ─────────────────────────────────────────────
-        const undoBtn = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-undo'));
-        const undoLabel = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-undo-label'));
+        // ── Lorebook Agent History Nav (← [LIVE] →) ─────────────────────────
+        const agentNavBack  = /** @type {HTMLButtonElement|null} */ (agentPanel.querySelector('#rt-agent-nav-back'));
+        const agentNavFwd   = /** @type {HTMLButtonElement|null} */ (agentPanel.querySelector('#rt-agent-nav-fwd'));
+        const agentNavLabel = /** @type {HTMLElement|null} */ (agentPanel.querySelector('#rt-agent-nav-label'));
 
-        const updateUndoLabel = () => {
+        const syncAgentNav = () => {
             const s = getSettings();
-            const count = (s.routerHistory || []).length;
-            if (undoLabel) undoLabel.textContent = count > 0 ? `Undo (${count})` : 'Undo';
-            if (undoBtn) undoBtn.style.opacity = count > 0 ? '1' : '0.35';
+            const histLen  = (s.routerHistory || []).length;
+            const redoLen  = _loreRedoStack.length;
+            if (agentNavBack)  agentNavBack.disabled  = histLen === 0;
+            if (agentNavFwd)   agentNavFwd.disabled   = redoLen === 0;
+            if (agentNavLabel) {
+                if (redoLen === 0) {
+                    agentNavLabel.textContent = '[ LIVE ]';
+                    agentNavLabel.classList.remove('clickable');
+                    agentNavLabel.title = '';
+                } else {
+                    agentNavLabel.textContent = `[ -${redoLen} \uD83D\uDD04 ]`;
+                    agentNavLabel.classList.add('clickable');
+                    agentNavLabel.title = 'Click to restore to current LIVE state';
+                }
+            }
         };
 
-        if (undoBtn) {
-            undoBtn.addEventListener('click', async () => {
+        // Label click: re-apply all redo entries at once to jump back to LIVE
+        if (agentNavLabel) {
+            agentNavLabel.addEventListener('click', async () => {
+                if (!_loreRedoStack.length) return;
+                if (agentNavBack) agentNavBack.disabled = true;
+                if (agentNavFwd)  agentNavFwd.disabled  = true;
+                agentNavLabel.classList.remove('clickable');
+                agentNavLabel.textContent = '[ … ]';
+
+                let failed = false;
+                while (_loreRedoStack.length) {
+                    const redoEntry = _loreRedoStack.pop();
+                    const ok = await reapplyRouterPass(redoEntry.prePassSnapshot, redoEntry.postPassState);
+                    if (!ok) {
+                        _loreRedoStack.push(redoEntry);
+                        failed = true;
+                        break;
+                    }
+                }
+
+                if (failed) {
+                    toastr['error']('Could not fully restore to LIVE state.', 'Lorebook Agent');
+                }
+                syncAgentNav();
+                await refreshManifest();
+            });
+        }
+
+        /** Snapshot the current lorebook state for the books touched by the given history entry. */
+        const captureCurrentLoreState = async (histEntry) => {
+            const ctx = SillyTavern.getContext();
+            const s   = getSettings();
+            const bookNames = Object.keys(histEntry.bookSnapshots || {});
+            const bookSnapshots = {};
+            for (const name of bookNames) {
+                try {
+                    const book = await ctx.loadWorldInfo(name);
+                    if (book) bookSnapshots[name] = JSON.parse(JSON.stringify(book));
+                } catch (_) {}
+            }
+            return {
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                activeRouterKeys: JSON.parse(JSON.stringify(s.activeRouterKeys || [])),
+                bookSnapshots,
+            };
+        };
+
+        if (agentNavBack) {
+            agentNavBack.addEventListener('click', async () => {
                 const s = getSettings();
                 if (!(s.routerHistory || []).length) return;
-                undoBtn.style.opacity = '0.5';
-                undoBtn.style.pointerEvents = 'none';
-                undoBtn.querySelector('i')?.classList.add('fa-spin');
+                agentNavBack.disabled = true;
+                if (agentNavFwd) agentNavFwd.disabled = true;
+                const histEntry = s.routerHistory[0];
+                const postPassState = await captureCurrentLoreState(histEntry);
                 const ok = await rollbackRouterPass(0);
-                undoBtn.querySelector('i')?.classList.remove('fa-spin');
-                undoBtn.style.pointerEvents = '';
                 if (ok) {
-                    toastr['success']('Lorebook state rolled back.', 'Lorebook Agent');
+                    _loreRedoStack.push({ prePassSnapshot: histEntry, postPassState });
                 } else {
                     toastr['error']('Rollback failed. Check console.', 'Lorebook Agent');
                 }
-                updateUndoLabel();
+                syncAgentNav();
+                await refreshManifest();
             });
         }
+
+        if (agentNavFwd) {
+            agentNavFwd.addEventListener('click', async () => {
+                if (!_loreRedoStack.length) return;
+                if (agentNavBack) agentNavBack.disabled = true;
+                agentNavFwd.disabled = true;
+                const redoEntry = _loreRedoStack.pop();
+                const ok = await reapplyRouterPass(redoEntry.prePassSnapshot, redoEntry.postPassState);
+                if (!ok) {
+                    _loreRedoStack.push(redoEntry);
+                    toastr['error']('Redo failed. Check console.', 'Lorebook Agent');
+                }
+                syncAgentNav();
+                await refreshManifest();
+            });
+        }
+
+        // updateUndoLabel kept as alias so existing call-sites still compile
+        const updateUndoLabel = syncAgentNav;
         // ── Active Keys Refresh Button ────────────────────────────────────────
         const keysRefreshBtn = agentPanel.querySelector('#rt-agent-keys-refresh');
         if (keysRefreshBtn) {
@@ -3081,17 +3283,27 @@ Rules:
             if (!terminal) return;
             const step = (/** @type {CustomEvent} */ (e)).detail;
             
-            if (step.type === 'start') _routerSteps = [];
+            if (step.type === 'start') {
+                _routerSteps = [];
+                _loreRedoStack = [];
+                syncAgentNav();
+            }
             _routerSteps.push(step);
 
             terminal.innerHTML = renderLorebookTerminal(_routerSteps);
             terminal.scrollTop = terminal.scrollHeight;
+
+            // Refresh Campaign Records after the pass fully completes — at this point
+            // all applyAction writes and saveWorldInfo cache-busts are guaranteed done.
+            if (step.type === 'finish' || step.type === 'error') {
+                refreshManifest();
+            }
         });
 
         if (terminalClear) {
             terminalClear.addEventListener('click', () => {
                 _routerSteps = [];
-                if (terminal) terminal.innerHTML = '<div style="opacity: 0.4; font-size: 10px; font-style: italic;">Waiting for agent activity...</div>';
+                if (terminal) terminal.innerHTML = '<div style="opacity: 0.4; font-size: 0.769em; font-style: italic;">Waiting for agent activity...</div>';
             });
         }
 
@@ -3452,7 +3664,7 @@ Rules:
         let isDragging = false;
         let startX, startY, startLeft, startTop;
 
-        handle.addEventListener('mousedown', (e) => {
+        const onMouseDown = (e) => {
             if (e.button !== 0) return;
             // Ignore clicks on buttons inside the header
             if (e.target instanceof Element && e.target.closest('button')) return;
@@ -3465,9 +3677,9 @@ Rules:
             panel.style.right = 'auto';
             panel.style.bottom = 'auto';
             e.preventDefault();
-        });
+        };
 
-        document.addEventListener('mousemove', (e) => {
+        const onMouseMove = (e) => {
             if (!isDragging) return;
             const left = startLeft + (e.clientX - startX);
             const top = startTop + (e.clientY - startY);
@@ -3478,9 +3690,9 @@ Rules:
 
             panel.style.left = boundedLeft + 'px';
             panel.style.top = boundedTop + 'px';
-        });
+        };
 
-        document.addEventListener('mouseup', () => {
+        const onMouseUp = () => {
             if (isDragging) {
                 isDragging = false;
                 if (customKey) {
@@ -3493,7 +3705,18 @@ Rules:
                     savePanelGeometry(panel);
                 }
             }
-        });
+        };
+
+        handle.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        return () => {
+            isDragging = false;
+            handle.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
     }
 
     /**
@@ -4384,6 +4607,39 @@ Rules:
      * @param {string} rawText
      * @returns {string}
      */
+    let _autoApplyTimer = null;
+    async function autoApplySysprompt() {
+        const s = getSettings();
+        if (s.customSysprompt) return;
+
+        const fileName = s.diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
+        let content;
+        try {
+            const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
+            if (response.ok) {
+                content = await response.text();
+            } else {
+                throw new Error(`Server returned ${response.status}`);
+            }
+        } catch (err) {
+            console.warn(`[Fatbody Framework] autoApplySysprompt: could not fetch ${fileName}, using fallback:`, err);
+            content = RT_PROMPTS[fileName];
+        }
+        if (!content) return;
+
+        content = buildSysprompt(content);
+        const mainTextarea = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('main_prompt_quick_edit_textarea'));
+        if (mainTextarea) {
+            mainTextarea.value = content;
+            mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+    }
+
+    function scheduleAutoApply() {
+        if (_autoApplyTimer) clearTimeout(_autoApplyTimer);
+        _autoApplyTimer = setTimeout(() => { _autoApplyTimer = null; autoApplySysprompt(); }, 400);
+    }
+
     function buildSysprompt(rawText) {
         if (!rawText) return "";
         const s = getSettings();
@@ -4969,7 +5225,7 @@ Rules:
             const fontSizeVal = $('#rpg_tracker_font_size_val');
             fontSizeInput.val(settings.fontSize || 13);
             if (fontSizeVal.length) fontSizeVal.text((settings.fontSize || 13) + 'px');
-            
+
             fontSizeInput.on('input', function() {
                 const val = parseInt(String($(this).val()));
                 if (isNaN(val) || val < 8 || val > 32) return;
@@ -4977,6 +5233,20 @@ Rules:
                 settings.fontSize = val;
                 saveSettings();
                 updateTrackerFontSize(val);
+            });
+
+            const agentFontSizeInput = $('#rpg_agent_font_size');
+            const agentFontSizeVal = $('#rpg_agent_font_size_val');
+            agentFontSizeInput.val(settings.agentFontSize || 13);
+            if (agentFontSizeVal.length) agentFontSizeVal.text((settings.agentFontSize || 13) + 'px');
+
+            agentFontSizeInput.on('input', function() {
+                const val = parseInt(String($(this).val()));
+                if (isNaN(val) || val < 8 || val > 32) return;
+                if (agentFontSizeVal.length) agentFontSizeVal.text(val + 'px');
+                settings.agentFontSize = val;
+                saveSettings();
+                updateAgentFontSize(val);
             });
 
             // Populate profiles using handleDropdown (fills real internal IDs, not names)
@@ -5273,7 +5543,7 @@ Rules:
                     const fresh = getSettings();
                     if (!fresh.syspromptModules) fresh.syspromptModules = {};
                     fresh.syspromptModules[key] = !!$(this).prop('checked');
-                    
+
                     if (key === 'quests') {
                         $('#rpg_quests_options').toggle(!!$(this).prop('checked'));
                         registerLogQuestTool();
@@ -5281,6 +5551,7 @@ Rules:
                     }
 
                     saveSettings();
+                    scheduleAutoApply();
                 });
 
                 if (key === 'quests') {
@@ -5290,14 +5561,24 @@ Rules:
 
             // Deadlines Toggle
             const deadlinesCb = /** @type {HTMLInputElement} */ (document.getElementById('rpg_quests_deadlines'));
+            const frustrationWrap = document.getElementById('rpg_quests_frustration_wrap');
+            const syncFrustrationVisibility = () => {
+                if (frustrationWrap) frustrationWrap.style.display = deadlinesCb?.checked ? '' : 'none';
+            };
             if (deadlinesCb) {
                 deadlinesCb.checked = !!getSettings().syspromptModules?.questsDeadlines;
+                syncFrustrationVisibility();
                 deadlinesCb.addEventListener('change', function () {
                     const fresh = getSettings();
                     if (!fresh.syspromptModules) fresh.syspromptModules = {};
                     fresh.syspromptModules.questsDeadlines = !!this.checked;
-                    
-                    // Legacy prompt update
+                    // If deadlines disabled, also uncheck frustration
+                    if (!this.checked) {
+                        fresh.syspromptModules.questsFrustration = false;
+                        const fCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_quests_frustration'));
+                        if (fCb) fCb.checked = false;
+                    }
+                    syncFrustrationVisibility();
                     if (fresh.questLegacyMode) {
                         refreshQuestLegacyPrompt(fresh);
                         refreshOrderList();
@@ -5305,6 +5586,7 @@ Rules:
                         registerLogQuestTool();
                     }
                     saveSettings();
+                    scheduleAutoApply();
                 });
             }
 
@@ -5316,8 +5598,6 @@ Rules:
                     const fresh = getSettings();
                     if (!fresh.syspromptModules) fresh.syspromptModules = {};
                     fresh.syspromptModules.questsFrustration = !!this.checked;
-                    
-                    // Legacy prompt update
                     if (fresh.questLegacyMode) {
                         refreshQuestLegacyPrompt(fresh);
                         refreshOrderList();
@@ -5325,6 +5605,7 @@ Rules:
                         registerLogQuestTool();
                     }
                     saveSettings();
+                    scheduleAutoApply();
                 });
             }
 
@@ -5336,8 +5617,6 @@ Rules:
                     const fresh = getSettings();
                     if (!fresh.syspromptModules) fresh.syspromptModules = {};
                     fresh.syspromptModules.questsDifficulty = !!this.checked;
-                    
-                    // Legacy prompt update
                     if (fresh.questLegacyMode) {
                         refreshQuestLegacyPrompt(fresh);
                         refreshOrderList();
@@ -5345,6 +5624,7 @@ Rules:
                         registerLogQuestTool();
                     }
                     saveSettings();
+                    scheduleAutoApply();
                 });
             }
 
@@ -5352,6 +5632,12 @@ Rules:
             $('#rt_quests_hardcore_help').on('click', (e) => {
                 e.stopPropagation();
                 showQuestsHardcoreExplanation();
+            });
+
+            // Components Help Trigger
+            $('#rt_components_help').on('click', (e) => {
+                e.stopPropagation();
+                showComponentsExplanation();
             });
 
 
@@ -5378,6 +5664,7 @@ Rules:
                     refreshOrderList();
                     registerLogQuestTool();
                     saveSettings();
+                    scheduleAutoApply();
                 });
             }
 
@@ -5400,6 +5687,7 @@ Rules:
                         fresh.diceFunctionTool = false;
                     }
                     saveSettings();
+                    scheduleAutoApply();
                 });
             }
 
@@ -5585,42 +5873,22 @@ Rules:
                 toastr['success']('Router prompt reset to default.', 'RPG Tracker');
             });
 
-            $('#rpg_tracker_btn_apply_sysprompt').on('click', async function () {
-                const fileName = getSettings().diceFunctionTool ? 'sysprompt.txt' : 'sysprompt_legacy.txt';
-                let content;
-                try {
-                    const response = await fetch(`/scripts/extensions/third-party/${FOLDER_NAME}/${fileName}`);
-                    if (response.ok) {
-                        content = await response.text();
-                    } else {
-                        throw new Error(`Server returned ${response.status}`);
-                    }
-                } catch (err) {
-                    console.warn(`[Fatbody Framework] Could not fetch ${fileName}, using hardcoded fallback:`, err);
-                    content = RT_PROMPTS[fileName];
-                }
-
-                if (!content) {
-                    toastr['error']('Could not load sysprompt.txt.', 'RPG Tracker');
-                    return;
-                }
-
-                content = buildSysprompt(content);
-
-                const mainTextarea = /** @type {HTMLTextAreaElement} */ (document.getElementById('main_prompt_quick_edit_textarea'));
-                if (mainTextarea) {
-                    mainTextarea.value = content;
-                    mainTextarea.dispatchEvent(new Event('blur', { bubbles: true }));
-                    toastr['success']('Main sysprompt applied! \u2705', 'RPG Tracker');
-                } else {
-                    try {
-                        await navigator.clipboard.writeText(content);
-                        toastr['warning']('Quick Prompt "Main" textarea not found. Sysprompt copied to clipboard. Make sure to enable function calls in the completion preset! \u2705', 'RPG Tracker');
-                    } catch (e) {
-                        toastr['warning']('Quick Prompt "Main" textarea not found and clipboard copy failed.', 'RPG Tracker');
-                    }
-                }
-            });
+            // Custom Sysprompt Mode toggle
+            const customSyspromptCb = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_custom_sysprompt'));
+            const narratorConfigBlock = document.getElementById('rpg_narrator_config_block');
+            const syncNarratorBlockVisibility = () => {
+                if (narratorConfigBlock) narratorConfigBlock.style.display = customSyspromptCb?.checked ? 'none' : '';
+            };
+            if (customSyspromptCb) {
+                customSyspromptCb.checked = !!getSettings().customSysprompt;
+                syncNarratorBlockVisibility();
+                customSyspromptCb.addEventListener('change', function () {
+                    const fresh = getSettings();
+                    fresh.customSysprompt = !!this.checked;
+                    saveSettings();
+                    syncNarratorBlockVisibility();
+                });
+            }
 
             $('#rpg_tracker_btn_update').on('click', async function () {
                 const { chat } = SillyTavern.getContext();
@@ -5741,10 +6009,18 @@ Rules:
         if (!panel) return;
         const s = size || getSettings().fontSize || 13;
         panel.style.setProperty('--rt-base-size', s + 'px');
-        
+
         // Also update CFE preview if open
         const cfe = document.getElementById('rt_cfe_preview');
         if (cfe) cfe.style.setProperty('--rt-base-size', s + 'px');
+    }
+
+    function updateAgentFontSize(size) {
+        const s = size || getSettings().agentFontSize || 13;
+        // Agent may be embedded in the main panel or detached to body
+        for (const el of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#rpg-tracker-agent'))) {
+            el.style.setProperty('--rt-base-size', s + 'px');
+        }
     }
 
     function addWandButton() {

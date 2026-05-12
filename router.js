@@ -449,9 +449,9 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             if (timePrefix && !delta.includes('[Day')) {
                 delta = timePrefix.trim() + ' ' + delta;
             }
-            // Append delta to the existing chronicle; preserve the [ID:] stamp at the top
+            // Append delta to the existing chronicle
             const existing = (book.entries[uid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
-            book.entries[uid].content = `[ID: ${up.id}]\n${existing}\n${delta}`;
+            book.entries[uid].content = existing ? `${existing}\n${delta}` : delta;
             await ctx.saveWorldInfo(bookName, book);
             changed = true;
         }
@@ -533,7 +533,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 // Strip [ID:] stamp from anywhere in the delta (model sometimes echoes it)
                 let delta = (rec.content || '').replace(/\[ID:[^\]]+\]\n?/gi, '').trim();
                 const existing = (bookData.entries[existingUid].content || '').replace(/^\[ID:[^\]]+\]\n?/i, '').trimEnd();
-                bookData.entries[existingUid].content = `[ID: ${fullId}]\n${existing}\n${delta}`;
+                bookData.entries[existingUid].content = existing ? `${existing}\n${delta}` : delta;
                 const keys = bookData.entries[existingUid].key || [];
                 (rec.keys || []).forEach(k => { if (!keys.includes(k)) keys.push(k); });
                 bookData.entries[existingUid].key = cleanKeys(keys);
@@ -544,14 +544,12 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
                 const uids = Object.keys(bookData.entries).map(Number).filter(n => !isNaN(n));
                 const nextUid = uids.length > 0 ? Math.max(...uids) + 1 : 0;
                 const fullId = `${targetBook}::${nextUid}`;
-                // Stamp the entry ID into content so the model can reference it when updating
-                const stampedContent = `[ID: ${fullId}]\n${rec.content || ''}`;
                 bookData.entries[nextUid] = {
                     uid: nextUid,
                     key: rec.keys || [rec.label],
                     keysecondary: [],
                     comment: rec.label || 'LORE_GEN',
-                    content: stampedContent,
+                    content: rec.content || '',
                     constant: false, selective: false, selectiveLogic: 0, addMemo: true,
                     order: 100, position: 0, disable: false,
                     probability: 100, useProbability: false,
@@ -731,6 +729,55 @@ export async function rollbackRouterPass(index = 0) {
         return true;
     } catch (e) {
         console.error('[RPG Tracker] Rollback failed:', e);
+        return false;
+    }
+}
+
+/**
+ * Re-applies a previously undone agent pass (redo).
+ * Pushes prePassSnapshot back onto routerHistory and restores lorebooks to postPassState.
+ * @param {{ timestamp: string, activeRouterKeys: string[], bookSnapshots: Record<string, any> }} prePassSnapshot
+ * @param {{ timestamp: string, activeRouterKeys: string[], bookSnapshots: Record<string, any> }} postPassState
+ * @returns {Promise<boolean>}
+ */
+export async function reapplyRouterPass(prePassSnapshot, postPassState) {
+    const settings = getSettings();
+    const ctx = SillyTavern.getContext();
+
+    try {
+        // Step 1: Put the pre-pass snapshot back so the user can undo again
+        if (!settings.routerHistory) settings.routerHistory = [];
+        settings.routerHistory.unshift(prePassSnapshot);
+        if (settings.routerHistory.length > 5) settings.routerHistory.length = 5;
+
+        // Step 2: Restore lorebooks to the post-pass state
+        for (const [bookName, bookData] of Object.entries(postPassState.bookSnapshots || {})) {
+            const saveRes = await fetch('/api/worldinfo/edit', {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ name: bookName, data: bookData })
+            });
+            if (!saveRes.ok) {
+                console.error(`[RPG Tracker] Redo: failed to restore ${bookName}: HTTP ${saveRes.status}`);
+                continue;
+            }
+            if (typeof ctx.saveWorldInfo === 'function') {
+                try { await ctx.saveWorldInfo(bookName, bookData); } catch (_) {}
+            }
+        }
+
+        if (typeof ctx.updateWorldInfoList === 'function') {
+            try { await ctx.updateWorldInfoList(); } catch (_) {}
+        }
+
+        // Step 3: Restore active keys to the post-pass state
+        settings.activeRouterKeys = JSON.parse(JSON.stringify(postPassState.activeRouterKeys || []));
+
+        ctx.saveSettingsDebounced();
+        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+        return true;
+    } catch (e) {
+        console.error('[RPG Tracker] Redo failed:', e);
         return false;
     }
 }
