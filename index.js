@@ -1851,7 +1851,7 @@ Rules:
             const ctx = SillyTavern.getContext();
             if (ctx && ctx.chat && ctx.chat.length) {
                 for (let i = ctx.chat.length - 1; i >= 0; i--) {
-                    const msgContent = ctx.chat[i]?.mes || ctx.chat[i]?.content || '';
+                    const msgContent = ctx.chat[i]?.mes || ctx.chat[i]?.['content'] || '';
                     const m = msgContent.match(/\(Location:\s*([^)]+)\)/i);
                     if (m) {
                         locText = m[1].trim();
@@ -3069,7 +3069,6 @@ Rules:
             await renderRouterUI();
             renderAgentDebug();
             updateUndoLabel();
-            refreshManifest();
         });
 
         // ── Lorebook Terminal Logic ──
