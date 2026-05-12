@@ -140,6 +140,20 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             ? allNames.filter(n => n.startsWith(prefix))
             : allNames;
 
+        // Deactivate any books from OTHER campaign stacks (look like Prefix_Category patterns)
+        // so only this campaign's stack is active after the pick.
+        if (prefix) {
+            const otherStacks = allNames.filter(n => {
+                if (bookNames.includes(n)) return false;           // same stack → skip
+                if (!n.includes('_')) return false;                // not a campaign book → skip
+                const root = n.slice(0, n.indexOf('_'));
+                return root !== prefix;                            // different campaign root
+            });
+            for (const name of otherStacks) {
+                await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`);
+            }
+        }
+
         for (const name of bookNames) {
             await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${name}"`);
         }
