@@ -98,7 +98,7 @@ PROCEDURE:
 <xp_system>
 AWARD XP inline immediately after the triggering event: *(+[X] XP — [reason])*
 
-XP should be attributed for all meaningful actions, not just completions of events/combat/quests. (Example: a breeder will get xp for successfully breeding, an assassin will get xp for successfully murdering a target, and bonus XP if undetected, etc). Minor XP amount can be attributed for minor actions, like +5xp for opening someone a stuck jar, +20xp for working out, 30xp for saving a cat from a tree, etc. Major XP gains should be reserved for quest/mission completions or extremely impactful actions.
+XP should be attributed for all meaningful actions, not just completions of events/combat/quests. For example, an assassin will get xp for successfully murdering a target, and bonus XP if undetected, etc. Minor XP amount can be attributed for minor actions, like +5xp for opening someone a stuck jar, +20xp for working out, 30xp for saving a cat from a tree, etc. Major XP gains should be reserved for quest/mission completions or extremely impactful actions.
 
 Do not overdo it excessively, not every action requires xp allocation. Only actions that 'achieve' or 'accomplish' something should award xp once at the end, not at every single step. Characters need to DESERVE XP.
 
