@@ -3798,11 +3798,12 @@ Rules:
         let isDragging = false;
         let startX, startY, startLeft, startTop;
 
-        const onMouseDown = (e) => {
+        const onPointerDown = (e) => {
             if (e.button !== 0) return;
             // Ignore clicks on buttons inside the header
             if (e.target instanceof Element && e.target.closest('button')) return;
             isDragging = true;
+            handle.setPointerCapture(e.pointerId);
             const rect = panel.getBoundingClientRect();
             startX = e.clientX; startY = e.clientY;
             startLeft = rect.left; startTop = rect.top;
@@ -3813,7 +3814,7 @@ Rules:
             e.preventDefault();
         };
 
-        const onMouseMove = (e) => {
+        const onPointerMove = (e) => {
             if (!isDragging) return;
             const left = startLeft + (e.clientX - startX);
             const top = startTop + (e.clientY - startY);
@@ -3826,7 +3827,7 @@ Rules:
             panel.style.top = boundedTop + 'px';
         };
 
-        const onMouseUp = () => {
+        const onPointerUp = () => {
             if (isDragging) {
                 isDragging = false;
                 if (customKey) {
@@ -3841,15 +3842,16 @@ Rules:
             }
         };
 
-        handle.addEventListener('mousedown', onMouseDown);
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+        handle.addEventListener('pointerdown', onPointerDown);
+        handle.addEventListener('pointermove', onPointerMove);
+        handle.addEventListener('pointerup', onPointerUp);
+        handle.addEventListener('pointercancel', () => { isDragging = false; });
 
         return () => {
             isDragging = false;
-            handle.removeEventListener('mousedown', onMouseDown);
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
+            handle.removeEventListener('pointerdown', onPointerDown);
+            handle.removeEventListener('pointermove', onPointerMove);
+            handle.removeEventListener('pointerup', onPointerUp);
         };
     }
 
@@ -3859,12 +3861,11 @@ Rules:
      * @param {HTMLElement} handle 
      */
     function makeResizableTR(panel, handle) {
-        let isResizing = false;
         let startX, startY, startWidth, startHeight, startTop, startLeft;
 
-        handle.addEventListener('mousedown', (e) => {
+        handle.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
-            isResizing = true;
+            handle.setPointerCapture(e.pointerId);
             const rect = panel.getBoundingClientRect();
             startX = e.clientX;
             startY = e.clientY;
@@ -3873,7 +3874,6 @@ Rules:
             startTop = rect.top;
             startLeft = rect.left;
 
-            // Switch to absolute/fixed values before moving
             panel.style.left = startLeft + 'px';
             panel.style.top = startTop + 'px';
             panel.style.right = 'auto';
@@ -3883,8 +3883,8 @@ Rules:
             e.stopPropagation();
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
+        handle.addEventListener('pointermove', (e) => {
+            if (!handle.hasPointerCapture(e.pointerId)) return;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
 
@@ -3893,19 +3893,19 @@ Rules:
             const newTop = startTop + dy;
 
             panel.style.width = newWidth + 'px';
-            // Only apply height/top if we're above min-height to prevent jumping
             if (newHeight > 200) {
                 panel.style.height = newHeight + 'px';
                 panel.style.top = newTop + 'px';
             }
         });
 
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
+        handle.addEventListener('pointerup', (e) => {
+            if (handle.hasPointerCapture(e.pointerId)) {
                 savePanelGeometry(panel);
             }
         });
+
+        handle.addEventListener('pointercancel', () => {});
     }
 
     function setupResizeObserver(panel) {
@@ -3923,24 +3923,26 @@ Rules:
         const deltaEl = /** @type {HTMLElement} */ (panel.querySelector('#rpg-tracker-delta'));
         let startY, startH;
 
-        handle.addEventListener('mousedown', (e) => {
+        handle.addEventListener('pointerdown', (e) => {
             startY = e.clientY;
             startH = deltaEl.offsetHeight;
+            handle.setPointerCapture(e.pointerId);
             e.preventDefault();
-
-            const onMove = (ev) => {
-                // dragging up = bigger console
-                const newH = Math.max(40, startH - (ev.clientY - startY));
-                deltaEl.style.height = newH + 'px';
-            };
-            const onUp = () => {
-                saveDeltaHeight(deltaEl.offsetHeight);
-                document.removeEventListener('mousemove', onMove);
-                document.removeEventListener('mouseup', onUp);
-            };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
         });
+
+        handle.addEventListener('pointermove', (e) => {
+            if (!handle.hasPointerCapture(e.pointerId)) return;
+            const newH = Math.max(40, startH - (e.clientY - startY));
+            deltaEl.style.height = newH + 'px';
+        });
+
+        handle.addEventListener('pointerup', (e) => {
+            if (handle.hasPointerCapture(e.pointerId)) {
+                saveDeltaHeight(deltaEl.offsetHeight);
+            }
+        });
+
+        handle.addEventListener('pointercancel', () => {});
     }
 
     function updateUIMemo(text) {
