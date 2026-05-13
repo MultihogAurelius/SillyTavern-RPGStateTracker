@@ -4853,10 +4853,8 @@ Rules:
     (async function init() {
         // Guard against double-init (e.g. browser serving a cached copy of this script
         // while the fresh copy also loads). Remove any stale panel/settings first.
-        if (document.getElementById('rpg-tracker-panel')) {
-            document.getElementById('rpg-tracker-panel')?.remove();
-        }
-        $('.rpg-tracker-settings').closest('.inline-drawer').remove();
+        document.getElementById('rpg-tracker-panel')?.remove();
+        document.querySelectorAll('.rpg-tracker-settings').forEach(el => el.remove());
 
         const ctx = SillyTavern.getContext();
         const { eventSource, event_types, renderExtensionTemplateAsync } = ctx;
