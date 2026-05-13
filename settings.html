@@ -267,20 +267,10 @@
                             <span>Enable Lorebook Agent</span>
                         </label>
 
-                        <div class="flex-container flexFlowColumn gap-1" style="margin-bottom: 8px;">
-                            <label>Campaign Root (Prefix)</label>
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <input id="rpg_tracker_router_campaign_prefix" type="text" class="text_pole" placeholder="e.g. Eldoria" style="flex: 1;" />
-                                <button id="rpg_tracker_router_prefix_pick" class="menu_button interactable" style="white-space: nowrap; font-size: 11px; padding: 4px 8px;" title="Pick a prefix from your existing world info books and activate its lorebook stack">Pick &amp; Activate…</button>
-                                <button id="rpg_tracker_router_prefix_link" class="menu_button interactable" style="white-space: nowrap; font-size: 11px; padding: 4px 8px;" title="Link this prefix's lorebook stack to the current chat so it auto-activates when you return">🔗 Link</button>
-                            </div>
-                            <p style="font-size: 10px; opacity: 0.6; margin: 0;">Namespace for this campaign's lorebooks (e.g. <i>Eldoria</i> → <i>Eldoria_NPCs</i>, <i>Eldoria_Locations</i>…). Saved per-chat.</p>
+                        <div style="margin-bottom: 8px; font-size: 10px; opacity: 0.65; line-height: 1.4;">
+                            Lorebook names and activation are managed automatically from the chat name.
+                            Current prefix: <span id="rpg_tracker_router_prefix_display" style="font-family: monospace; opacity: 0.9;">—</span>
                         </div>
-
-                        <label class="checkbox_label" style="margin-bottom: 8px;" title="When enabled, all lorebooks belonging to this campaign auto-activate whenever you switch to this chat.">
-                            <input id="rpg_tracker_router_auto_activate" type="checkbox" />
-                            <span>Auto-activate book stack on chat switch</span>
-                        </label>
                         
                         <div class="inline-drawer">
                             <div class="inline-drawer-toggle inline-drawer-header">

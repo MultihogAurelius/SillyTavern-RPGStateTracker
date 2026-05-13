@@ -24,6 +24,7 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
     let _stateModelRunning = false;
     let _stateController = null;   // To abort ongoing state updates
     let _currentChatId = null;
+    let _prefixDeriveTimer = null; // Pending CHAT_CHANGED → prefix-derivation timer
     let themeUndoStack = [];
     let _pillDeselectHandler = null;
     let renderRouterUI = null;
@@ -112,6 +113,22 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
     let _loreRedoStack = [];  // in-memory; cleared when a new agent pass starts
 
     /**
+     * Returns true if `bookName` belongs to the given `prefix`.
+     * A book belongs when it is EITHER the prefix itself OR exactly
+     * `prefix + '_' + <single-word suffix>` — the suffix must contain
+     * no underscores so that "Assistant" never accidentally matches
+     * "Assistant_2026_05_13_NPCs" (which belongs to a different, longer prefix).
+     * @param {string} bookName
+     * @param {string} prefix
+     */
+    function bookBelongsToPrefix(bookName, prefix) {
+        if (!prefix) return false;
+        if (bookName === prefix) return true;
+        const rest = bookName.startsWith(prefix + '_') ? bookName.slice(prefix.length + 1) : null;
+        return rest !== null && !rest.includes('_');
+    }
+
+    /**
      * Activates every lorebook that belongs to the current campaign in SillyTavern's
      * world-info system (equivalent to toggling them ON in the World Info panel).
      * Uses the full ST lorebook registry filtered by campaign prefix, so keyless
@@ -124,6 +141,9 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         if (typeof ctx.executeSlashCommandsWithOptions !== 'function') return 0;
 
         const prefix = s.routerCampaignPrefix || '';
+        // No valid prefix → do nothing. Never touch lorebook state with an
+        // unknown / ambiguous prefix or we risk activating books from other sessions.
+        if (!prefix) return 0;
 
         // Flush ST registry so freshly-written books are visible
         if (typeof ctx.updateWorldInfoList === 'function') {
@@ -136,22 +156,21 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
             try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
         }
 
-        const bookNames = prefix
-            ? allNames.filter(n => n.startsWith(prefix))
-            : allNames;
+        const bookNames = allNames.filter(n => bookBelongsToPrefix(n, prefix));
 
-        // Deactivate any books from OTHER campaign stacks (look like Prefix_Category patterns)
-        // so only this campaign's stack is active after the pick.
-        if (prefix) {
-            const otherStacks = allNames.filter(n => {
-                if (bookNames.includes(n)) return false;           // same stack → skip
-                if (!n.includes('_')) return false;                // not a campaign book → skip
-                const root = n.slice(0, n.indexOf('_'));
-                return root !== prefix;                            // different campaign root
-            });
-            for (const name of otherStacks) {
-                await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`);
-            }
+        // Deactivate every managed book that does NOT belong to the current prefix.
+        // A "managed" book is any name that looks like "<something>_<SingleWordSuffix>",
+        // i.e. it has exactly one underscore-separated word at the end with no digits —
+        // same shape as auto-generated lorebooks. This safely ignores user's own books.
+        const toDeactivate = allNames.filter(n => {
+            if (bookNames.includes(n)) return false; // current session → keep
+            const lastUs = n.lastIndexOf('_');
+            if (lastUs <= 0) return false;
+            const tail = n.slice(lastUs + 1);
+            return /^[A-Za-z]+$/.test(tail); // looks like a managed book
+        });
+        for (const name of toDeactivate) {
+            await ctx.executeSlashCommandsWithOptions(`/world state=off silent=true "${name}"`);
         }
 
         for (const name of bookNames) {
@@ -220,9 +239,10 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         
         s.activeRouterKeys = JSON.parse(JSON.stringify(saved.activeRouterKeys || []));
         s.routerLog        = JSON.parse(JSON.stringify(saved.routerLog || []));
-        s.routerCampaignPrefix = saved.routerCampaignPrefix || '';
-        const prefixInput = /** @type {HTMLInputElement} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
-        if (prefixInput) prefixInput.value = s.routerCampaignPrefix;
+        // Don't restore routerCampaignPrefix from per-chat saved state — the prefix
+        // is fully derivable from the chat ID and must be re-derived live by
+        // onChatChanged. Restoring a stale value (e.g. a bare "Assistant" from
+        // a previous buggy run) would cause greedy lorebook matching.
 
         _historyViewIndex = -1;
         
@@ -331,6 +351,18 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
     }
 
     /**
+     * Sanitizes a ST chat ID into a filesystem/lorebook-safe prefix.
+     * The chat ID is already unique per session, so it's used verbatim
+     * with only unsafe characters replaced.
+     * @param {string} chatId
+     * @returns {string}
+     */
+    function derivePrefixFromChatId(chatId) {
+        if (!chatId) return '';
+        return String(chatId).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    /**
      * Called on CHAT_CHANGED. Saves the departing chat's state,
      * then loads the arriving chat's state — or resets the memo if
      * this is a new/unseen chat (no saved state).
@@ -345,59 +377,51 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
         // Reset the run-every tick so the agent fires promptly on the first generation of each chat
         resetRouterTick();
 
-        // Auto-activate and prefix logic run regardless of chatLinkEnabled
-        const chatBooks = s.chatStates?.[newChatId]?.campaignBooks;
+        // Auto-activate and prefix logic run regardless of chatLinkEnabled.
+        // Always re-derive the prefix from the chat ID so stale saved data never
+        // causes the wrong session's lorebooks to activate.
+        if (s.routerEnabled && newChatId) {
+            // Cancel any pending prefix-derivation from a previous CHAT_CHANGED
+            // so a transient chat ID (e.g. mid-rename) can't sneak through.
+            if (_prefixDeriveTimer) clearTimeout(_prefixDeriveTimer);
+            _prefixDeriveTimer = setTimeout(async () => {
+                _prefixDeriveTimer = null;
+                // Bail if a newer chat change has come in while we were waiting.
+                if (newChatId !== _currentChatId) return;
 
-        if (chatBooks?.length) {
-            // This chat has a linked stack — activate it
-            if (typeof SillyTavern.getContext().executeSlashCommandsWithOptions === 'function') {
-                (async () => {
-                    const ctx = SillyTavern.getContext();
-                    if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList().catch(() => {});
-                    for (const bookName of chatBooks) {
-                        await ctx.executeSlashCommandsWithOptions(`/world state=on silent=true "${bookName}"`).catch(() => {});
-                    }
-                })();
-            }
-        } else if (s.routerEnabled && newChatId) {
-            // No linked stack — auto-derive a unique prefix from char name + date and link
-            setTimeout(async () => {
+                const prefix = derivePrefixFromChatId(newChatId);
                 const s2 = getSettings();
-                if (s2.chatStates?.[newChatId]?.campaignBooks?.length) return; // linked in the meantime
-                const ctx = SillyTavern.getContext();
+                const prefixDisplay = document.getElementById('rpg_tracker_router_prefix_display');
 
-                // Build prefix: "<CharName>_<YYYY>_<MM>_<DD>"
-                // Chat IDs look like: "Korgath Iron-Hide - 2026-05-13@03h39m38s064ms"
-                // Fall back to just the character name if the date can't be parsed.
-                let prefix = '';
-                const dateMatch = newChatId.match(/^(.+?) - (\d{4})-(\d{2})-(\d{2})@/);
-                if (dateMatch) {
-                    const charPart = dateMatch[1].trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-                    prefix = `${charPart}_${dateMatch[2]}_${dateMatch[3]}_${dateMatch[4]}`;
-                } else {
-                    const charName = (ctx.name2 || '').trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-                    prefix = charName;
+                if (!prefix) {
+                    // Chat ID doesn't have a usable timestamp (transient ST state
+                    // during rename, or unusual format). Clear the live prefix and
+                    // do NOT touch any lorebook state.
+                    s2.routerCampaignPrefix = '';
+                    if (prefixDisplay) prefixDisplay.textContent = '—';
+                    return;
                 }
 
-                if (!prefix) return;
-
                 s2.routerCampaignPrefix = prefix;
-                const prefixInput = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_router_campaign_prefix'));
-                if (prefixInput) prefixInput.value = prefix;
-                // Link any existing lorebooks that match this unique prefix
+                if (prefixDisplay) prefixDisplay.textContent = prefix;
+
+                const ctx = SillyTavern.getContext();
                 if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList().catch(() => {});
                 let allNames = [];
                 if (typeof ctx.getWorldInfoNames === 'function') {
                     try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
                 }
-                const matchingBooks = allNames.filter(n => n.startsWith(prefix));
+                const matchingBooks = allNames.filter(n => bookBelongsToPrefix(n, prefix));
+
                 if (!s2.chatStates) s2.chatStates = {};
                 if (!s2.chatStates[newChatId]) s2.chatStates[newChatId] = {};
                 s2.chatStates[newChatId].campaignBooks = matchingBooks;
                 saveSettings();
                 if (s2.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
-                if (matchingBooks.length) activateCampaignBooks().catch(() => {});
-            }, 800); // small delay so ctx.name2 and chatId are fully populated
+                // Always call activateCampaignBooks so previous-session books get
+                // deactivated even when the new chat has no lorebooks yet.
+                activateCampaignBooks().catch(() => {});
+            }, 800);
         }
 
         if (!s.chatLinkEnabled) {
@@ -1262,6 +1286,8 @@ Rules:
     globalThis._rpgRunStateModelPass = runStateModelPass;
     globalThis._rpgStateModelRunning = () => _stateModelRunning;
     globalThis._rpgCurrentChatId = () => _currentChatId;
+    // Expose live prefix derivation for any module that needs the current prefix.
+    globalThis._rpgGetCurrentPrefix = () => derivePrefixFromChatId(SillyTavern.getContext().chatId || '');
 
     function handleLevelUp() {
         const { sendSystemMessage } = SillyTavern.getContext();
@@ -1668,6 +1694,7 @@ Rules:
             }
             refreshOrderList();
             saveSettings();
+            scheduleAutoApply();
         };
 
         // RNG Mode Sync
@@ -1785,6 +1812,15 @@ Rules:
             onboardingCustomSyspromptCb.checked = !!getSettings().customSysprompt;
             onboardingCustomSyspromptCb.addEventListener('change', () => {
                 syncSettingsAndUI(s => { s.customSysprompt = !!onboardingCustomSyspromptCb.checked; });
+            });
+        }
+
+        // Apply System Prompt button (onboarding) — same logic as settings panel "Update Main Sysprompt"
+        const onboardingBtnApply = el.querySelector('#rt_onboarding_btn_update_sysprompt');
+        if (onboardingBtnApply) {
+            onboardingBtnApply.addEventListener('click', async () => {
+                await autoApplySysprompt();
+                toastr['success']('System prompt applied! \u2705', 'RPG Tracker');
             });
         }
 
@@ -2804,9 +2840,6 @@ Rules:
                 autoActivateCheck.addEventListener('change', () => {
                     const s = getSettings();
                     s.routerAutoActivateBooks = autoActivateCheck.checked;
-                    // Keep in sync with the settings sidebar toggle
-                    const sidebarCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rpg_tracker_router_auto_activate'));
-                    if (sidebarCheck) sidebarCheck.checked = s.routerAutoActivateBooks;
                     saveSettings();
                 });
             }
@@ -2949,20 +2982,9 @@ Rules:
                 });
             }
 
-            const prefixInput = /** @type {HTMLInputElement} */ (panel.querySelector('#rpg_tracker_router_campaign_prefix'));
-            if (prefixInput) {
-                prefixInput.value = settings.routerCampaignPrefix || "";
-                prefixInput.addEventListener('input', (e) => {
-                    const s = getSettings();
-                    s.routerCampaignPrefix = (/** @type {HTMLInputElement} */ (e.target)).value;
-                    saveSettings();
-                    if (s.chatLinkEnabled && _currentChatId) {
-                        saveChatState(_currentChatId);
-                    }
-                });
-            }
-
-            // ── Pick prefix: wired in settings section below ──
+            // Prefix is auto-derived from chat name — update read-only display in agent panel
+            const panelPrefixDisplay = panel.querySelector('#rpg_tracker_router_prefix_display');
+            if (panelPrefixDisplay) panelPrefixDisplay.textContent = settings.routerCampaignPrefix || '—';
             
             const sourceSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-source'));
             const profGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-profile-group'));
@@ -5912,118 +5934,9 @@ Rules:
             });
             setTimeout(updateRouterConnectionPanels, 100); // Ensure DOM is ready for toggle
 
-            $('#rpg_tracker_router_campaign_prefix').val(settings.routerCampaignPrefix || '').on('input', function () {
-                const s = getSettings();
-                s.routerCampaignPrefix = String($(this).val() || '');
-                saveSettings();
-                if (s.chatLinkEnabled && _currentChatId) {
-                    saveChatState(_currentChatId);
-                }
-            });
-
-            // ── Pick prefix from existing world info books (settings sidebar) ──
-            $('#rpg_tracker_router_prefix_pick').on('click', async function () {
-                const ctx = SillyTavern.getContext();
-                if (typeof ctx.updateWorldInfoList === 'function') {
-                    try { await ctx.updateWorldInfoList(); } catch (_) {}
-                }
-                let allNames = [];
-                if (typeof ctx.getWorldInfoNames === 'function') {
-                    try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
-                }
-                if (!allNames.length) {
-                    toastr['info']('No world info books found.', 'Lorebook Agent');
-                    return;
-                }
-                const roots = [...new Set(allNames.map(n => {
-                    const idx = n.indexOf('_');
-                    return idx > 0 ? n.slice(0, idx) : n;
-                }))].sort();
-
-                const btn = /** @type {HTMLElement} */ (this);
-                const existing = document.getElementById('rt-prefix-pick-dropdown');
-                if (existing) { existing.remove(); return; }
-
-                const dropdown = document.createElement('div');
-                dropdown.id = 'rt-prefix-pick-dropdown';
-                dropdown.style.cssText = 'position:fixed; z-index:99999; background:#1e1e2e; border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:4px 0; max-height:240px; overflow-y:auto; min-width:180px; box-shadow:0 4px 16px rgba(0,0,0,0.5);';
-
-                roots.forEach(r => {
-                    const item = document.createElement('div');
-                    item.textContent = r;
-                    item.style.cssText = 'padding:6px 12px; cursor:pointer; font-size:0.9em; color:#ddd;';
-                    item.addEventListener('mouseenter', () => { item.style.background = 'rgba(255,255,255,0.08)'; });
-                    item.addEventListener('mouseleave', () => { item.style.background = ''; });
-                    item.addEventListener('click', async () => {
-                        const s = getSettings();
-                        s.routerCampaignPrefix = r;
-                        $('#rpg_tracker_router_campaign_prefix').val(r);
-                        saveSettings();
-                        if (s.chatLinkEnabled && _currentChatId) saveChatState(_currentChatId);
-                        dropdown.remove();
-                        // Immediately activate all lorebooks matching this prefix
-                        const count = await activateCampaignBooks();
-                        toastr['success'](`Prefix set to "${r}" — activated ${count} lorebook(s).`, 'Lorebook Agent');
-                    });
-                    dropdown.appendChild(item);
-                });
-
-                const btnRect = btn.getBoundingClientRect();
-                dropdown.style.top = (btnRect.bottom + 4) + 'px';
-                dropdown.style.left = btnRect.left + 'px';
-                document.body.appendChild(dropdown);
-
-                const closeOnOutsideClick = (/** @type {MouseEvent} */ ev) => {
-                    if (!dropdown.contains(/** @type {Node} */ (ev.target))) {
-                        dropdown.remove();
-                        document.removeEventListener('click', closeOnOutsideClick, true);
-                    }
-                };
-                setTimeout(() => document.addEventListener('click', closeOnOutsideClick, true), 0);
-            });
-
-            // Link prefix to current chat
-            $('#rpg_tracker_router_prefix_link').on('click', async function () {
-                const s = getSettings();
-                const prefix = s.routerCampaignPrefix || '';
-                if (!prefix) {
-                    toastr['warning']('Set a Campaign Prefix first.', 'Lorebook Agent');
-                    return;
-                }
-                if (!_currentChatId) {
-                    toastr['warning']('No active chat to link to.', 'Lorebook Agent');
-                    return;
-                }
-                const ctx = SillyTavern.getContext();
-                if (typeof ctx.updateWorldInfoList === 'function') {
-                    try { await ctx.updateWorldInfoList(); } catch (_) {}
-                }
-                let allNames = [];
-                if (typeof ctx.getWorldInfoNames === 'function') {
-                    try { allNames = await ctx.getWorldInfoNames(); } catch (_) {}
-                }
-                const matchingBooks = allNames.filter(n => n.startsWith(prefix));
-                if (!s.chatStates) s.chatStates = {};
-                if (!s.chatStates[_currentChatId]) s.chatStates[_currentChatId] = {};
-                s.chatStates[_currentChatId].campaignBooks = matchingBooks;
-                saveSettings();
-                toastr['success'](
-                    `Linked ${matchingBooks.length} lorebook(s) to this chat. They will auto-activate when you return.`,
-                    'Lorebook Agent'
-                );
-            });
-
-            // Auto-activate book stack toggle (settings sidebar)
-            $('#rpg_tracker_router_auto_activate')
-                .prop('checked', !!settings.routerAutoActivateBooks)
-                .on('change', function () {
-                    const s = getSettings();
-                    s.routerAutoActivateBooks = !!$(this).prop('checked');
-                    // Keep in sync with the in-panel Auto-link checkbox
-                    const inPanelCheck = /** @type {HTMLInputElement|null} */ (document.getElementById('rt-agent-auto-activate'));
-                    if (inPanelCheck) inPanelCheck.checked = s.routerAutoActivateBooks;
-                    saveSettings();
-                });
+            // Prefix display (read-only — auto-derived from chat name)
+            const prefixDisplayEl = document.getElementById('rpg_tracker_router_prefix_display');
+            if (prefixDisplayEl) prefixDisplayEl.textContent = settings.routerCampaignPrefix || '—';
 
             // Router Ollama
             $('#rpg_tracker_router_ollama_url').val(settings.routerOllamaUrl).on('input', function () {

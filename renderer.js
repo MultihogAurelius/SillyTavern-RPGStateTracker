@@ -777,6 +777,10 @@ const DEFAULT_XP_COLOR = 'linear-gradient(90deg, #0088ff, #00d4ff)';
                         <input type="checkbox" id="rt_onboarding_custom_sysprompt" />
                         <span style="font-size: 0.88em; opacity: 0.8;">Custom Sysprompt Mode — I'll manage my own system prompt</span>
                     </label>
+
+                    <button id="rt_onboarding_btn_update_sysprompt" style="width: 100%; margin-top: 10px; padding: 7px 12px; background: rgba(0, 200, 140, 0.18); border: 1px solid #00c88c; border-radius: 4px; color: var(--rt-text, #eee); font-size: 0.88em; cursor: pointer;" title="Writes the system prompt to your Quick Prompt Main box based on the options selected above.">
+                        ↑ Apply System Prompt
+                    </button>
                 </div>
 
                 <div style="font-size: 13px; opacity: 0.9; margin-top: 12px; flex-shrink: 0; line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">

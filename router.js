@@ -1,8 +1,46 @@
-﻿import { getSettings } from './state-manager.js';
+import { getSettings } from './state-manager.js';
 import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
+
+/**
+ * Sanitizes any ST chat ID into a filesystem/lorebook-safe prefix.
+ * The chat ID is already unique per session (whether ST's default
+ * "Name - 2026-05-13@..." format or a user-renamed value like "324325345"),
+ * so we use it AS the prefix verbatim ? only converting unsafe characters
+ * to underscores.
+ * @param {string} chatId
+ * @returns {string}
+ */
+function derivePrefixFromChatId(chatId) {
+    if (!chatId) return '';
+    return String(chatId).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Returns the current campaign prefix derived live from ST's ctx.chatId.
+ * Returns '' only if there is no active chat at all.
+ */
+function getLivePrefix() {
+    const ctx = SillyTavern.getContext();
+    return derivePrefixFromChatId(ctx.chatId || '');
+}
+
+/**
+ * Returns true if `bookName` belongs to the given `prefix`.
+ * Exact match: bookName === prefix, OR bookName === prefix + '_' + <single-word suffix>
+ * (suffix must contain no underscores to prevent "Assistant" from matching
+ * "Assistant_2026_05_13_NPCs" which belongs to a different longer prefix).
+ * @param {string} bookName
+ * @param {string} prefix
+ */
+function bookBelongsToPrefix(bookName, prefix) {
+    if (!prefix) return false;
+    if (bookName === prefix) return true;
+    const rest = bookName.startsWith(prefix + '_') ? bookName.slice(prefix.length + 1) : null;
+    return rest !== null && !rest.includes('_');
+}
 
 /**
  * Parses a single Action: toolname({...}) call from a text response.
@@ -112,7 +150,12 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         broadcastStep('start', 'Initializing Lorebook Agent...');
 
         const startTime = Date.now();
-        const prefix = settings.routerCampaignPrefix || '';
+        const prefix = getLivePrefix();
+        if (!prefix) {
+            broadcastStep('error', 'Cannot run: no campaign prefix available. The chat name may not have loaded yet ? try again in a moment.');
+            _routerRunning = false;
+            return;
+        }
         let basicSummary = '';
         
         async function fetchArchiveBooks() {
@@ -121,14 +164,15 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
                 try { await ctx.updateWorldInfoList(); } catch (_) {}
             }
             const allBookNames = await getWorldInfoNamesSafe();
-            const scoped = new Set(prefix ? allBookNames.filter(n => n.startsWith(prefix)) : allBookNames);
+            const inScope = (n) => !prefix || bookBelongsToPrefix(n, prefix);
+            const scoped = new Set(prefix ? allBookNames.filter(inScope) : allBookNames);
 
             // Also sweep books referenced in routerLog (catches books not yet formally indexed)
             const logBookNames = (settings.routerLog || [])
                 .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
                 .filter(Boolean);
             for (const n of logBookNames) {
-                if (!prefix || n.startsWith(prefix)) scoped.add(n);
+                if (inScope(n)) scoped.add(n);
             }
 
             const books = {};
@@ -141,7 +185,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
 
         let archiveBooks = await fetchArchiveBooks();
 
-        // â”€â”€ Snapshot state BEFORE this pass (for rollback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ?? Snapshot state BEFORE this pass (for rollback) ??????????????????
         {
             const snapshot = {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -246,7 +290,7 @@ Examples:
 
 Also include each ancestor name (Khelt, Rust-Lantern District) as a plain keyword in the Keywords field.
 
-NPC / FAC / QUEST / EVENT labels: Name only — NO " :: " hierarchy, NO tag prefix.
+NPC / FAC / QUEST / EVENT labels: Name only ? NO " :: " hierarchy, NO tag prefix.
 Example: [[FAC: Iron Syndicate | ...]]  NOT  [[FAC: Khelt :: Iron Syndicate | ...]]  and  NOT  [[FAC: FAC: Iron Syndicate | ...]]
 
 ## ATTENTION & MEMORY
@@ -406,7 +450,7 @@ Include ancestor location names as plain keywords (e.g. keys: ["Khelt", "Rust-La
 ${Object.values(settings.routerModules || {}).filter(m => m.enabled).map(m => `- ${m.tag}: ${m.instruction}`).join('\n')}${(settings.routerCustomTags || []).length ? '\n\n### CUSTOM CATEGORIES\n' + (settings.routerCustomTags || []).map(m => `- ${m.tag.toUpperCase()}: ${m.instruction}`).join('\n') : ''}`;
 
             const agentSystemPrompt = usesNativeTools
-                // Clean prompt for native tool calling — model gets schemas via the API
+                // Clean prompt for native tool calling ? model gets schemas via the API
                 ? `${basePrompt}
 
 ## YOUR ROLE
@@ -414,7 +458,7 @@ You are a lorebook research agent. Maintain the campaign lorebook using the prov
 Use grep_lore / inspect_book / read_entry to look up existing data before recording.
 When research is complete, call commit once to write all changes. Stop immediately after.
 ${sharedContext}`
-                // Text-format prompt for profile/default — model outputs Action:/Observation: text
+                // Text-format prompt for profile/default ? model outputs Action:/Observation: text
                 : `${basePrompt}
 
 ## YOUR ROLE
@@ -427,10 +471,10 @@ Output exactly ONE action per turn in this format:
   Action: toolname({"arg": "value"})
 
 Available actions:
-- grep_lore({"query": "..."}) — search lorebooks for entries matching a keyword
-- inspect_book({"book_name": "..."}) — list UIDs in a lorebook
-- read_entry({"uid": "Book::0"}) — read full content of an entry
-- commit({"record": [...], "update": [...], "activate": [...], "deactivate": [...], "delete_ids": [...]}) — write all changes and finish
+- grep_lore({"query": "..."}) ? search lorebooks for entries matching a keyword
+- inspect_book({"book_name": "..."}) ? list UIDs in a lorebook
+- read_entry({"uid": "Book::0"}) ? read full content of an entry
+- commit({"record": [...], "update": [...], "activate": [...], "deactivate": [...], "delete_ids": [...]}) ? write all changes and finish
 
 commit record items: {"label": "Name only (NO tag prefix)", "keys": ["kw1","kw2"], "content": "...", "category": "NPC|LOC|FAC|QUEST|EVENT"}
 commit update items: {"id": "Book::UID", "content": "new text to append"}
@@ -473,7 +517,7 @@ ${sharedContext}`;
                 }
 
                 if (!resolvedToolCall) {
-                    // No tool call and no parseable action — model is done
+                    // No tool call and no parseable action ? model is done
                     break;
                 }
 
@@ -631,13 +675,13 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
     // 3. Record new (with Deduplication)
     // Group entries by target book and commit once per book to avoid UID collisions
     const records = action.record || [];
-    const prefix = settings.routerCampaignPrefix || '';
+    const prefix = getLivePrefix();
     const baseBook = prefix || 'World Chronicle';
     const recordedIds = [];
 
     // -- Phase A: Route each record to its target book --
     const catMap = { 'NPC': 'NPCs', 'LOC': 'Locations', 'QUEST': 'Quests', 'FAC': 'Factions', 'EVENT': 'Events' };
-    // Extend with user-defined custom tags so they get their own books (e.g. WEATHER → prefix_Weather)
+    // Extend with user-defined custom tags so they get their own books (e.g. WEATHER ? prefix_Weather)
     for (const ct of (settings.routerCustomTags || [])) {
         const t = ct.tag.toUpperCase();
         if (!catMap[t]) catMap[t] = t.charAt(0) + t.slice(1).toLowerCase();
@@ -651,7 +695,7 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
         const targetBook = catName ? (prefix ? `${prefix}_${catMap[catName]}` : catMap[catName]) : baseBook;
 
         // Strip any accidental "TAG: " prefix the model may have included in the label
-        // e.g. "FAC: Iron Syndicate" → "Iron Syndicate", "STATS: Thalric Thorne" → "Thalric Thorne"
+        // e.g. "FAC: Iron Syndicate" ? "Iron Syndicate", "STATS: Thalric Thorne" ? "Thalric Thorne"
         if (rec.label) {
             rec.label = rec.label.replace(/^[A-Z_]{2,10}:\s+/i, '').trim();
         }
@@ -864,18 +908,18 @@ export async function rollbackRouterPass(index = 0) {
 
     try {
         const prePassBooks = new Set(Object.keys(snapshot.bookSnapshots || {}));
-        const prefix = settings.routerCampaignPrefix || '';
+        const prefix = getLivePrefix();
 
-        // ── Step 1: Delete lorebooks that were CREATED during the pass ────────
+        // -- Step 1: Delete lorebooks that were CREATED during the pass --------
         // Fetch current book list scoped to the campaign prefix (or all if none).
         const allCurrentNames = await getWorldInfoNamesSafe();
         const scopedCurrent = prefix
-            ? allCurrentNames.filter(n => n.startsWith(prefix))
+            ? allCurrentNames.filter(n => bookBelongsToPrefix(n, prefix))
             : allCurrentNames;
 
         for (const bookName of scopedCurrent) {
-            if (prePassBooks.has(bookName)) continue; // Pre-existed — restore below, don't delete
-            // This book was CREATED during the pass — permanently delete it
+            if (prePassBooks.has(bookName)) continue; // Pre-existed ? restore below, don't delete
+            // This book was CREATED during the pass ? permanently delete it
             let deleted = false;
             try {
                 const delRes = await fetch('/api/worldinfo/delete', {
@@ -905,7 +949,7 @@ export async function rollbackRouterPass(index = 0) {
             try { await ctx.updateWorldInfoList(); } catch (_) {}
         }
 
-        // ── Step 2: Restore pre-pass lorebooks to their snapshotted state ─────
+        // -- Step 2: Restore pre-pass lorebooks to their snapshotted state -----
         for (const [bookName, bookData] of Object.entries(snapshot.bookSnapshots || {})) {
             const saveRes = await fetch('/api/worldinfo/edit', {
                 method: 'POST',
@@ -922,10 +966,10 @@ export async function rollbackRouterPass(index = 0) {
             }
         }
 
-        // ── Step 3: Restore active keys ───────────────────────────────────────
+        // -- Step 3: Restore active keys ---------------------------------------
         settings.activeRouterKeys = JSON.parse(JSON.stringify(snapshot.activeRouterKeys || []));
 
-        // ── Step 4: Trim snapshots newer than the restored point ──────────────
+        // -- Step 4: Trim snapshots newer than the restored point --------------
         settings.routerHistory = history.slice(index + 1);
 
         ctx.saveSettingsDebounced();
@@ -1155,7 +1199,7 @@ Output a JSON object:
         if (match) {
             const data = JSON.parse(match[0]);
             
-            const prefix = settings.routerCampaignPrefix || '';
+            const prefix = getLivePrefix();
             const lorebookName = prefix ? `${prefix}World_Chronicle` : 'World Chronicle';
             const newId = await addLorebookEntry(lorebookName, {
                 id: data.id,
@@ -1188,7 +1232,7 @@ Output a JSON object:
 export async function getLorebookManifest() {
     const settings = getSettings();
     const ctx = SillyTavern.getContext();
-    const prefix = settings.routerCampaignPrefix || '';
+    const prefix = getLivePrefix();
     
     // Always flush ST's registry from disk first so books written via HTTP API are visible
     if (typeof ctx.updateWorldInfoList === 'function') {
@@ -1196,16 +1240,16 @@ export async function getLorebookManifest() {
     }
 
     const names = await getWorldInfoNamesSafe();
-    // With no prefix, show nothing — the user hasn't set a campaign yet.
+    // With no prefix, show nothing ? the user hasn't set a campaign yet.
     if (!prefix) return [];
-    const scoped = names.filter(n => n.startsWith(prefix));
+    const scoped = names.filter(n => bookBelongsToPrefix(n, prefix));
     
     // Fallback 1: books referenced in activeRouterKeys (not yet in registry)
     const activeBookNames = (settings.activeRouterKeys || [])
         .map(k => k.split('::')[0])
         .filter(Boolean);
     for (const n of activeBookNames) {
-        if (!scoped.includes(n) && n.startsWith(prefix)) {
+        if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
             scoped.push(n);
         }
     }
@@ -1216,7 +1260,7 @@ export async function getLorebookManifest() {
         .flatMap(e => [...(e.record || []), ...(e.activate || [])].map(id => id.split('::')[0]))
         .filter(Boolean);
     for (const n of logBookNames) {
-        if (!scoped.includes(n) && n.startsWith(prefix)) {
+        if (!scoped.includes(n) && bookBelongsToPrefix(n, prefix)) {
             scoped.push(n);
         }
     }
