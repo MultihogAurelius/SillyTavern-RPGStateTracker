@@ -1658,12 +1658,16 @@
         padding-bottom: 12px !important; /* ensure last row isn't clipped mid-height */
     }
 
-    /* Extra breathing room at the bottom of the agent content scroll area */
-    #rpg-tracker-agent .rpg-tracker-content {
-        padding-bottom: 20px !important;
-    }
 }
 
+
+/* ── Lorebook Agent panel: block flow in scroll area (all viewports; detached + desktop).
+   .rpg-tracker-content defaults to flex column — as a flex item that breaks wrapped chip layout. */
+#rpg-tracker-agent .rpg-tracker-content {
+    display: block !important;
+    min-height: 0 !important;
+    padding-bottom: 20px !important;
+}
 
 /* ── Connection Settings Panels ── */
 #rpg_tracker_profile_group,

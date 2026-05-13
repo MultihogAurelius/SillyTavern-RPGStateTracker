@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.2.2] - 2026-05-14
+
+### Fixed
+- **Lorebook Agent panel layout**: Active Lore Keys now use normal document flow on desktop and detached panels (`#rpg-tracker-agent .rpg-tracker-content` block layout + `min-height: 0`), so wrapped pills push the Lorebook Terminal down instead of overlapping it. Removed temporary layout debug instrumentation.
+
 ## [2.2.1] - 2026-05-14
 
 ### Fixed

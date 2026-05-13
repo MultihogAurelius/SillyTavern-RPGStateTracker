@@ -2589,16 +2589,6 @@ Rules:
                     }
                 });
             });
-            // #region agent log
-            try {
-                const termHdr = agentPanel.querySelector('#rt-agent-router-terminal')?.previousElementSibling;
-                if (keysContainer && termHdr instanceof HTMLElement) {
-                    const k = keysContainer.getBoundingClientRect();
-                    const t = termHdr.getBoundingClientRect();
-                    fetch('http://127.0.0.1:7738/ingest/f360df56-6f31-4c1c-b069-27c74b3b29a5', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '324f84' }, body: JSON.stringify({ sessionId: '324f84', runId: 'post-fix', hypothesisId: 'H1', location: 'index.js:renderRouterUI:layout', message: 'Active keys vs Lorebook Terminal header', data: { activeKeyCount: activeKeys.length, keysBottom: k.bottom, termTop: t.top, gapPx: Math.round(t.top - k.bottom), keysClientH: keysContainer.clientHeight, keysScrollH: keysContainer.scrollHeight }, timestamp: Date.now() }) }).catch(() => {});
-                }
-            } catch (_e) { /* ignore */ }
-            // #endregion
         }
         
         // Assigned below when the agent panel is wired. Declared here so
