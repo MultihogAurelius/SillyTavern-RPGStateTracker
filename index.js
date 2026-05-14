@@ -369,6 +369,18 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
     }
 
     /**
+     * Updates the campaign prefix readout in Extension settings and the Lorebook Agent panel.
+     * @param {string} [raw] - Prefix string, or empty / whitespace for "—".
+     */
+    function syncRouterPrefixDisplays(raw) {
+        const label = (raw && String(raw).trim()) ? String(raw).trim() : '—';
+        const settingsEl = document.getElementById('rpg_tracker_router_prefix_display');
+        if (settingsEl) settingsEl.textContent = label;
+        const agentEl = document.getElementById('rt-agent-router-prefix-display');
+        if (agentEl) agentEl.textContent = label;
+    }
+
+    /**
      * Called on CHAT_CHANGED. Saves the departing chat's state,
      * then loads the arriving chat's state — or resets the memo if
      * this is a new/unseen chat (no saved state).
@@ -397,20 +409,19 @@ import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManife
 
                 const prefix = derivePrefixFromChatId(newChatId);
                 const s2 = getSettings();
-                const prefixDisplay = document.getElementById('rpg_tracker_router_prefix_display');
 
                 if (!prefix) {
                     // Chat ID doesn't have a usable timestamp (transient ST state
                     // during rename, or unusual format). Clear the live prefix and
                     // do NOT touch any lorebook state.
                     s2.routerCampaignPrefix = '';
-                    if (prefixDisplay) prefixDisplay.textContent = '—';
+                    syncRouterPrefixDisplays('');
                     void refreshAgentManifest().catch(() => {});
                     return;
                 }
 
                 s2.routerCampaignPrefix = prefix;
-                if (prefixDisplay) prefixDisplay.textContent = prefix;
+                syncRouterPrefixDisplays(prefix);
 
                 const ctx = SillyTavern.getContext();
                 if (typeof ctx.updateWorldInfoList === 'function') await ctx.updateWorldInfoList().catch(() => {});
@@ -2333,6 +2344,10 @@ Rules:
                     </div>
                 </div>
                 <div class="rpg-tracker-footer" id="rt-agent-footer">
+                    <div id="rt-agent-campaign-prefix-strip" style="padding: 6px 8px 5px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.65em; line-height: 1.35; color: var(--rt-text-muted);" title="Managed lorebooks: {prefix} or {prefix}_Module (one segment after _, no extra underscores).">
+                        <div style="opacity: 0.8; font-weight: 600; margin-bottom: 3px; letter-spacing: 0.03em;">CAMPAIGN PREFIX</div>
+                        <div id="rt-agent-router-prefix-display" style="font-family: var(--rt-font-mono); color: var(--rt-text); word-break: break-all; font-size: 1.05em;">${settings.routerCampaignPrefix ? escapeHtml(settings.routerCampaignPrefix) : '—'}</div>
+                    </div>
                     <div class="rpg-tracker-nav">
                         <button class="rpg-tracker-nav-btn" id="rt-agent-nav-back" title="Undo last lorebook pass">←</button>
                         <span class="rpg-tracker-nav-label" id="rt-agent-nav-label">[ LIVE ]</span>
@@ -2608,7 +2623,11 @@ Rules:
                 e.stopPropagation();
                 const isHidden = (/** @type {HTMLElement} */ (agentPanel)).style.display === 'none';
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = isHidden ? 'flex' : 'none';
-                if (isHidden) { renderRouterUI(); refreshManifest(); }
+                if (isHidden) {
+                    syncRouterPrefixDisplays(getSettings().routerCampaignPrefix || '');
+                    renderRouterUI();
+                    refreshManifest();
+                }
             });
             agentCloseBtn.addEventListener('click', () => {
                 (/** @type {HTMLElement} */ (agentPanel)).style.display = 'none';
@@ -3106,9 +3125,8 @@ Rules:
                 });
             }
 
-            // Prefix is auto-derived from chat name — update read-only display in agent panel
-            const panelPrefixDisplay = panel.querySelector('#rpg_tracker_router_prefix_display');
-            if (panelPrefixDisplay) panelPrefixDisplay.textContent = settings.routerCampaignPrefix || '—';
+            // Prefix is auto-derived from chat id — sync settings + agent footer readouts
+            syncRouterPrefixDisplays(settings.routerCampaignPrefix || '');
             
             const sourceSel = /** @type {HTMLSelectElement} */ (agentPanel.querySelector('#rt-agent-router-source'));
             const profGrp = /** @type {HTMLElement} */ (agentPanel.querySelector('#rt-agent-router-profile-group'));
@@ -3244,6 +3262,7 @@ Rules:
                     agentPanel.classList.add('rt-detached-panel');
                     agentPanel.style.display = 'flex'; // Force visibility if detached
                     document.body.appendChild(agentPanel);
+                    syncRouterPrefixDisplays(getSettings().routerCampaignPrefix || '');
                     renderRouterUI(); // Ensure it's populated
                     refreshManifest();
                     const header = agentPanel.querySelector('.rpg-tracker-header');
