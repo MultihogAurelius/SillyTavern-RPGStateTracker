@@ -6,7 +6,7 @@ import { deduplicateMemo, mergeMemo, computeDelta, escapeHtml, escapeRegex, high
 import { renderSubFieldByRule, tryRenderMarker, renderCustomBlockLine, stripMemoHtml, escapeHtmlWithColor, parseMemoBlocks, getPageSize, loadCollapsed, saveCollapsed, loadDetached, saveDetached, blockToItems, renderMemoAsCards, renderQuestLog, renderLorebookTerminal } from './renderer.js';
 import { registerLogQuestTool, checkQuestDeadlines } from './quests.js';
 import { initializeDebugViewer, toggleDebugViewer } from './debug-viewer.js';
-import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, disableManagedEntries } from './router.js';
+import { runRouterPass, rollbackRouterPass, reapplyRouterPass, getLorebookManifest, deleteLorebookEntry, updateLorebookEntry, disableManagedEntries, isRouterRunning } from './router.js';
 
     // Capture the folder name dynamically from the module URL so it works regardless of what the user names the folder
     const FOLDER_NAME = (function () {
@@ -2727,6 +2727,137 @@ Rules:
 
             // Tracks which lorebook folders are open across refreshes
             const _manifestOpenFolders = new Set();
+            // Tracks entries that have unsaved edits: id → { content, keys, comment }
+            /** @type {Map<string, {content:string, keys:string, comment:string}>} */
+            const _dirtyEntries = new Map();
+            // Tracks entries whose body is currently expanded
+            const _openEntries = new Set();
+
+            /**
+             * Builds and wires the editable entry body element for one manifest item.
+             * Called per-entry both on first render and on refresh (skipped if dirty).
+             */
+            const buildEntryBody = (item) => {
+                const body = document.createElement('div');
+                body.style.cssText = 'display:none; padding:4px 4px 6px 12px; flex-direction:column; gap:5px;';
+                body.dataset.entryId = item.id;
+
+                // ── Stale badge (shown when a refresh found external changes) ──
+                const staleBadge = document.createElement('div');
+                staleBadge.style.cssText = 'display:none; font-size:9px; color:#ffa500; font-style:italic;';
+                staleBadge.textContent = '⚠ Entry changed externally — save discards external changes or cancel to reload.';
+                body.appendChild(staleBadge);
+
+                // ── Title / comment ──
+                const titleRow = document.createElement('div');
+                titleRow.style.cssText = 'display:flex; gap:4px; align-items:center;';
+                const titleLbl = document.createElement('span');
+                titleLbl.style.cssText = 'font-size:9px; opacity:0.5; color:var(--rt-text-muted); flex-shrink:0;';
+                titleLbl.textContent = 'Title:';
+                const titleInp = document.createElement('input');
+                titleInp.type = 'text';
+                titleInp.value = item.label;
+                titleInp.style.cssText = 'flex:1; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.12); border-radius:3px; font-size:9px; padding:2px 5px; min-width:0;';
+                titleRow.appendChild(titleLbl);
+                titleRow.appendChild(titleInp);
+                body.appendChild(titleRow);
+
+                // ── Keywords ──
+                const keysRow = document.createElement('div');
+                keysRow.style.cssText = 'display:flex; gap:4px; align-items:center;';
+                const keysLbl = document.createElement('span');
+                keysLbl.style.cssText = 'font-size:9px; opacity:0.5; color:var(--rt-text-muted); flex-shrink:0;';
+                keysLbl.textContent = 'Keys:';
+                const keysInp = document.createElement('input');
+                keysInp.type = 'text';
+                keysInp.value = item.keys.join(', ');
+                keysInp.placeholder = 'keyword1, keyword2, …';
+                keysInp.style.cssText = 'flex:1; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.12); border-radius:3px; font-size:9px; padding:2px 5px; font-family:var(--rt-font-mono); min-width:0;';
+                keysRow.appendChild(keysLbl);
+                keysRow.appendChild(keysInp);
+                body.appendChild(keysRow);
+
+                // ── Content ──
+                const contentArea = document.createElement('textarea');
+                contentArea.value = item.content || '';
+                contentArea.rows = 5;
+                contentArea.style.cssText = 'width:100%; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.12); border-radius:3px; font-size:9px; padding:4px 5px; line-height:1.4; resize:vertical; box-sizing:border-box; font-family:var(--rt-font-mono);';
+
+                // Mark dirty on any change
+                const markDirty = () => {
+                    _dirtyEntries.set(item.id, {
+                        content: contentArea.value,
+                        keys: keysInp.value,
+                        comment: titleInp.value,
+                    });
+                };
+                titleInp.addEventListener('input', markDirty);
+                keysInp.addEventListener('input', markDirty);
+                contentArea.addEventListener('input', markDirty);
+                body.appendChild(contentArea);
+
+                // ── Action bar ──
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display:flex; gap:5px; justify-content:flex-end; align-items:center;';
+
+                const saveBtn = document.createElement('button');
+                saveBtn.style.cssText = 'background:rgba(0,200,140,0.15); border:1px solid rgba(0,200,140,0.4); color:#00c88c; border-radius:3px; font-size:9px; padding:2px 8px; cursor:pointer;';
+                saveBtn.textContent = 'Save';
+                saveBtn.title = 'Save changes to lorebook';
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.style.cssText = 'background:transparent; border:1px solid rgba(255,255,255,0.12); color:var(--rt-text-muted); border-radius:3px; font-size:9px; padding:2px 8px; cursor:pointer;';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.title = 'Discard edits and reload from lorebook';
+
+                actions.appendChild(cancelBtn);
+                actions.appendChild(saveBtn);
+                body.appendChild(actions);
+
+                // ── Save handler ──
+                saveBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (isRouterRunning()) {
+                        // @ts-ignore
+                        toastr.warning('Agent is running — wait for it to finish before saving.', 'Lorebook Agent');
+                        return;
+                    }
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '…';
+                    const rawKeys = keysInp.value.split(',').map(k => k.trim()).filter(Boolean);
+                    const ok = await updateLorebookEntry(item.id, {
+                        content: contentArea.value,
+                        key: rawKeys,
+                        comment: titleInp.value,
+                    });
+                    if (ok) {
+                        _dirtyEntries.delete(item.id);
+                        staleBadge.style.display = 'none';
+                        saveBtn.textContent = 'Save';
+                        saveBtn.disabled = false;
+                        document.dispatchEvent(new CustomEvent('rt_lore_agent_updated'));
+                        // @ts-ignore
+                        toastr.success('Entry saved.', 'Lorebook Agent');
+                    } else {
+                        saveBtn.textContent = 'Save';
+                        saveBtn.disabled = false;
+                        // @ts-ignore
+                        toastr.error('Save failed.', 'Lorebook Agent');
+                    }
+                });
+
+                // ── Cancel handler: reload from lorebook ──
+                cancelBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    _dirtyEntries.delete(item.id);
+                    staleBadge.style.display = 'none';
+                    titleInp.value = item.label;
+                    keysInp.value = item.keys.join(', ');
+                    contentArea.value = item.content || '';
+                });
+
+                return body;
+            };
 
             refreshManifest = async () => {
                 const list = agentPanel.querySelector('#rt-agent-manifest-list');
@@ -2794,30 +2925,42 @@ Rules:
 
                             const entryHdr = document.createElement('div');
                             entryHdr.style.cssText = 'display:flex; align-items:center; gap:5px; padding:3px 4px; cursor:pointer; border-radius:3px;';
+
+                            const isDirty = _dirtyEntries.has(item.id);
                             entryHdr.innerHTML = `
                                 <div style="width:5px; height:5px; border-radius:50%; background:${statusColor}; flex-shrink:0;" title="${item.is_active ? 'Active (visible to agent)' : 'Inactive'}"></div>
-                                <span style="flex:1; font-size:10px; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.label)}</span>
+                                <span style="flex:1; font-size:10px; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.label)}${isDirty ? ' <span style="color:#ffa500; font-size:8px;" title="Unsaved edits">●</span>' : ''}</span>
                                 <button class="rt-agent-entry-delete" data-id="${item.id}" style="background:none; border:none; color:var(--rt-text-muted); cursor:pointer; font-size:9px; padding:1px 3px; opacity:0; flex-shrink:0;" title="Delete entry"><i class="fa-solid fa-trash"></i></button>
                             `;
 
-                            const entryBody = document.createElement('div');
-                            entryBody.style.cssText = 'display:none; padding:4px 4px 6px 12px; flex-direction:column; gap:4px;';
-                            entryBody.innerHTML = `
-                                <div style="font-size:9px; opacity:0.5; color:var(--rt-text-muted); font-family:var(--rt-font-mono);">[${escapeHtml(item.keys.join(', '))}]</div>
-                                <div style="font-size:10px; opacity:0.85; color:var(--rt-text); line-height:1.45; white-space:pre-wrap; word-break:break-word;">${escapeHtml(item.content)}</div>
-                            `;
+                            // ── Entry body: reuse existing DOM if dirty, otherwise build fresh ──
+                            let entryBody;
+                            if (isDirty) {
+                                // Keep the live editor — just flag it as potentially stale
+                                entryBody = document.createElement('div');
+                                entryBody.style.cssText = 'display:flex; flex-direction:column; gap:5px; padding:4px 4px 6px 12px;';
+                                entryBody.textContent = ''; // placeholder; real body reinjected below
+                                // We'll swap it after appendChild via a flag
+                            } else {
+                                entryBody = buildEntryBody(item);
+                                if (_openEntries.has(item.id)) {
+                                    entryBody.style.display = 'flex';
+                                    entryHdr.style.background = 'rgba(255,255,255,0.05)';
+                                }
+                            }
 
                             // Show delete button on hover
                             const delBtn = /** @type {HTMLButtonElement} */ (entryHdr.querySelector('.rt-agent-entry-delete'));
                             entryHdr.addEventListener('mouseenter', () => { delBtn.style.opacity = '0.5'; });
                             entryHdr.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
 
-                            // Toggle entry body on click (but not on delete)
                             entryHdr.addEventListener('click', (e) => {
                                 if (/** @type {HTMLElement} */ (e.target).closest('.rt-agent-entry-delete')) return;
                                 const opening = entryBody.style.display === 'none';
                                 entryBody.style.display = opening ? 'flex' : 'none';
                                 entryHdr.style.background = opening ? 'rgba(255,255,255,0.05)' : '';
+                                if (opening) _openEntries.add(item.id);
+                                else _openEntries.delete(item.id);
                             });
 
                             delBtn.addEventListener('click', async (e) => {
@@ -2825,6 +2968,8 @@ Rules:
                                 if (confirm(`Delete lore entry "${item.label}"?`)) {
                                     const ok = await deleteLorebookEntry(item.id);
                                     if (ok) {
+                                        _dirtyEntries.delete(item.id);
+                                        _openEntries.delete(item.id);
                                         refreshManifest();
                                         // @ts-ignore
                                         toastr.success(`Deleted "${item.label}"`, 'Lorebook Agent');
@@ -2835,6 +2980,25 @@ Rules:
                             entryEl.appendChild(entryHdr);
                             entryEl.appendChild(entryBody);
                             folderBody.appendChild(entryEl);
+
+                            // If dirty: rebuild the real editor and inject it, marking stale
+                            if (isDirty) {
+                                const realBody = buildEntryBody(item);
+                                const dirty = _dirtyEntries.get(item.id);
+                                // Restore the user's in-progress edits
+                                const titleInp = /** @type {HTMLInputElement} */ (realBody.querySelector('input[type="text"]'));
+                                const keysInp = /** @type {HTMLInputElement} */ (realBody.querySelectorAll('input[type="text"]')[1]);
+                                const contentArea = /** @type {HTMLTextAreaElement} */ (realBody.querySelector('textarea'));
+                                const staleBadge = /** @type {HTMLElement} */ (realBody.querySelector('div[style*="ffa500"]'));
+                                if (titleInp && dirty?.comment !== undefined)   titleInp.value   = dirty.comment;
+                                if (keysInp  && dirty?.keys    !== undefined)   keysInp.value    = dirty.keys;
+                                if (contentArea && dirty?.content !== undefined) contentArea.value = dirty.content;
+                                if (staleBadge) staleBadge.style.display = 'block';
+                                realBody.style.display = 'flex';
+                                entryHdr.style.background = 'rgba(255,255,255,0.05)';
+                                entryEl.replaceChild(realBody, entryBody);
+                                _openEntries.add(item.id);
+                            }
                         }
 
                         folder.appendChild(folderHdr);

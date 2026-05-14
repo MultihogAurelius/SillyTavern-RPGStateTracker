@@ -4,6 +4,9 @@ import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
 
+/** Returns true while a router pass is actively running. */
+export function isRouterRunning() { return _routerRunning; }
+
 /**
  * Sanitizes any ST chat ID into a filesystem/lorebook-safe prefix.
  * The chat ID is already unique per session (whether ST's default
@@ -1331,6 +1334,35 @@ export async function deleteLorebookEntry(id) {
     }
     
     return true;
+}
+
+/**
+ * Updates editable fields on a single lorebook entry in-place.
+ * Reads the book first so other fields (disable, extensions, etc.) are preserved.
+ * @param {string} id - "BookName::uid"
+ * @param {{ content?: string, key?: string[], comment?: string }} fields
+ * @returns {Promise<boolean>}
+ */
+export async function updateLorebookEntry(id, fields) {
+    const [bookName, uid] = id.split('::');
+    if (!bookName || !uid) return false;
+
+    const ctx = SillyTavern.getContext();
+    const book = await ctx.loadWorldInfo(bookName);
+    if (!book?.entries || !book.entries[uid]) return false;
+
+    const entry = book.entries[uid];
+    if (fields.content  !== undefined) entry.content = fields.content;
+    if (fields.comment  !== undefined) entry.comment = fields.comment;
+    if (fields.key      !== undefined) entry.key     = cleanKeys(fields.key);
+
+    try {
+        await ctx.saveWorldInfo(bookName, book);
+        return true;
+    } catch (e) {
+        console.error('[RPG Tracker] updateLorebookEntry failed:', e);
+        return false;
+    }
 }
 
 /**
