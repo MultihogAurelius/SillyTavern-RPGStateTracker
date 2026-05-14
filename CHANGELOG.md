@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.2.7] - 2026-05-14
+
+### Changed
+- **Modular slot bar**: Tuned `+` / `×` controls smaller (~15px, lighter borders) after v2.2.6 overshoot.
+
 ## [2.2.6] - 2026-05-14
 
 ### Changed

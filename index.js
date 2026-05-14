@@ -2838,8 +2838,8 @@ Rules:
                 const pipeSt  = 'color:rgba(255,255,255,0.2); font-size:0.708em; padding:0 2px; user-select:none;';
                 const brktSt  = 'color:rgba(255,255,255,0.18); font-size:0.708em; user-select:none;';
                 const inpSt   = 'font-size:0.692em; padding:1px 4px; border-radius:10px; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.18); text-align:center; outline:none; min-width:28px; box-sizing:content-box;';
-                const rmSt    = 'display:inline-flex; align-items:center; justify-content:center; min-width:26px; min-height:26px; margin-left:2px; flex-shrink:0; border-radius:6px; background:rgba(255,80,80,0.18); border:1px solid rgba(255,120,120,0.45); color:#ff8888; font-size:1em; font-weight:bold; line-height:1; cursor:pointer; padding:0; box-sizing:border-box;';
-                const addSt   = 'display:inline-flex; align-items:center; justify-content:center; min-width:26px; min-height:26px; flex-shrink:0; border-radius:6px; background:rgba(0,255,170,0.14); border:1px solid rgba(0,255,170,0.5); color:var(--rt-accent); font-size:1.1em; font-weight:bold; line-height:1; cursor:pointer; padding:0 2px; margin:0 2px; box-sizing:border-box;';
+                const rmSt    = 'display:inline-flex; align-items:center; justify-content:center; min-width:15px; min-height:15px; margin-left:1px; flex-shrink:0; border-radius:4px; background:rgba(255,80,80,0.12); border:1px solid rgba(255,120,120,0.28); color:#cc8888; font-size:0.72em; font-weight:bold; line-height:1; cursor:pointer; padding:0; box-sizing:border-box;';
+                const addSt   = 'display:inline-flex; align-items:center; justify-content:center; min-width:15px; min-height:15px; flex-shrink:0; border-radius:4px; background:rgba(0,255,170,0.08); border:1px solid rgba(0,255,170,0.32); color:var(--rt-accent); font-size:0.78em; font-weight:bold; line-height:1; cursor:pointer; padding:0 1px; margin:0 1px; box-sizing:border-box; opacity:0.95;';
 
                 const renderBar = (currentFmt) => {
                     bar.innerHTML = '';
