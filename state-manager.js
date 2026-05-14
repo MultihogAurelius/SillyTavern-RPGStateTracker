@@ -259,6 +259,20 @@ Example: "[Day 1, 11:52] Character signed the contract with Brodrik."
         s.routerModules.fac.format = DEFAULT_MODULES.fac.format;
     }
 
+    // Ensure all stock modules have a format field (in case of old saves missing it)
+    for (const [key, def] of Object.entries(DEFAULT_MODULES)) {
+        if (s.routerModules?.[key] && !s.routerModules[key].format) {
+            s.routerModules[key].format = def.format;
+        }
+    }
+
+    // Ensure all custom tags have a format field
+    if (Array.isArray(s.routerCustomTags)) {
+        for (const ct of s.routerCustomTags) {
+            if (!ct.format) ct.format = 'Name | Description | Keywords';
+        }
+    }
+
     return extensionSettings[MODULE_NAME];
 }
 

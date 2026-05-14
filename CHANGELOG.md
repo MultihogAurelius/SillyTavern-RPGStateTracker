@@ -2,6 +2,13 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.2.5] - 2026-05-14
+
+### Changed
+- **Slot editor: add/remove support** — `+` button adds a new middle slot before Keywords; `×` on any middle slot removes it. Works for both stock modules and custom tags.
+- **Custom tags now have a format** — same slot bar UI as stock modules; `format` field added to custom tag objects (migrated on load). The prompt builder and parser both use it.
+- **Parser simplified** — FAC and QUEST dedicated branches removed; the generic `first=name, middle=body, last=keywords` branch handles all tags uniformly, including any number of slots.
+
 ## [2.2.4] - 2026-05-14
 
 ### Changed

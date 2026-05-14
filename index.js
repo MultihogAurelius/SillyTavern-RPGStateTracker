@@ -2825,172 +2825,167 @@ Rules:
             // Initial load so the list is populated without needing a manual click
             refreshManifest();
 
+            /**
+             * Shared slot bar: [[TAG: Name | [slot ×]... + | Keywords]]
+             * Middle labels are editable + removable; a + button adds a new slot.
+             * onFormatChange(newFmt) is called whenever the format string changes.
+             */
+            const buildSlotBar = (tagName, format, onFormatChange) => {
+                const parseSegs = (fmt) => (fmt || 'Name | Description | Keywords').split('|').map(s => s.trim());
+                const bar = document.createElement('div');
+                bar.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin-bottom:2px; font-family:var(--rt-font-mono);';
+                const chipSt  = 'padding:1px 6px; border-radius:10px; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.32); font-size:0.708em; white-space:nowrap; cursor:default; user-select:none;';
+                const pipeSt  = 'color:rgba(255,255,255,0.2); font-size:0.708em; padding:0 2px; user-select:none;';
+                const brktSt  = 'color:rgba(255,255,255,0.18); font-size:0.708em; user-select:none;';
+                const inpSt   = 'font-size:0.692em; padding:1px 4px; border-radius:10px; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.18); text-align:center; outline:none; min-width:28px; box-sizing:content-box;';
+                const rmSt    = 'background:none; border:none; color:rgba(255,80,80,0.45); font-size:0.6em; cursor:pointer; padding:0 2px; line-height:1; vertical-align:middle;';
+                const addSt   = 'background:none; border:none; color:rgba(0,255,170,0.35); font-size:0.65em; cursor:pointer; padding:0 3px; line-height:1; opacity:0.7;';
+
+                const renderBar = (currentFmt) => {
+                    bar.innerHTML = '';
+                    bar.dataset.fmt = currentFmt;
+                    const segs     = parseSegs(currentFmt);
+                    const fixed0   = segs[0] || 'Name';
+                    const fixedEnd = segs[segs.length - 1] || 'Keywords';
+                    const middles  = segs.length > 2 ? segs.slice(1, -1) : [];
+
+                    const open = document.createElement('span');
+                    open.style.cssText = brktSt;
+                    open.textContent = `[[${tagName}: `;
+                    bar.appendChild(open);
+
+                    const chip0 = document.createElement('span');
+                    chip0.style.cssText = chipSt;
+                    chip0.title = 'Fixed — always the entry name';
+                    chip0.textContent = fixed0;
+                    bar.appendChild(chip0);
+
+                    middles.forEach((label, idx) => {
+                        const pipe = document.createElement('span');
+                        pipe.style.cssText = pipeSt;
+                        pipe.textContent = ' |';
+                        bar.appendChild(pipe);
+
+                        const wrap = document.createElement('span');
+                        wrap.style.cssText = 'display:inline-flex; align-items:center; gap:1px;';
+
+                        const inp = document.createElement('input');
+                        inp.type = 'text';
+                        inp.value = label;
+                        inp.title = 'Rename this slot — the AI fills this section based on its name';
+                        inp.style.cssText = inpSt;
+                        inp.style.width = Math.max(28, label.length * 7) + 'px';
+                        inp.addEventListener('input', () => { inp.style.width = Math.max(28, inp.value.length * 7) + 'px'; });
+                        inp.addEventListener('change', () => {
+                            const s = parseSegs(bar.dataset.fmt);
+                            s[idx + 1] = inp.value.trim() || label;
+                            const nf = s.join(' | ');
+                            bar.dataset.fmt = nf;
+                            onFormatChange(nf);
+                        });
+                        wrap.appendChild(inp);
+
+                        const rmBtn = document.createElement('button');
+                        rmBtn.style.cssText = rmSt;
+                        rmBtn.title = 'Remove this slot';
+                        rmBtn.textContent = '×';
+                        rmBtn.addEventListener('click', () => {
+                            const s = parseSegs(bar.dataset.fmt);
+                            s.splice(idx + 1, 1);
+                            const nf = s.join(' | ');
+                            onFormatChange(nf);
+                            renderBar(nf);
+                        });
+                        wrap.appendChild(rmBtn);
+                        bar.appendChild(wrap);
+                    });
+
+                    const addBtn = document.createElement('button');
+                    addBtn.style.cssText = addSt;
+                    addBtn.title = 'Add a slot';
+                    addBtn.textContent = '+';
+                    addBtn.addEventListener('click', () => {
+                        const s = parseSegs(bar.dataset.fmt);
+                        s.splice(s.length - 1, 0, 'Slot');
+                        const nf = s.join(' | ');
+                        onFormatChange(nf);
+                        renderBar(nf);
+                    });
+                    bar.appendChild(addBtn);
+
+                    const pipeLast = document.createElement('span');
+                    pipeLast.style.cssText = pipeSt;
+                    pipeLast.textContent = ' |';
+                    bar.appendChild(pipeLast);
+
+                    const chipLast = document.createElement('span');
+                    chipLast.style.cssText = chipSt;
+                    chipLast.title = 'Fixed — always comma-separated search keywords';
+                    chipLast.textContent = fixedEnd;
+                    bar.appendChild(chipLast);
+
+                    const close = document.createElement('span');
+                    close.style.cssText = brktSt;
+                    close.textContent = ']]';
+                    bar.appendChild(close);
+                };
+                renderBar(format);
+                return bar;
+            };
+
             const renderAgentModules = () => {
                 const s = getSettings();
                 const list = agentPanel.querySelector('#rt-agent-stock-modules-list');
                 if (!list) return;
                 list.innerHTML = '';
 
-                /**
-                 * Build the inline slot bar: [[TAG: Name | [slot]... | Keywords]]
-                 * Name and Keywords are fixed dim chips; middle slots are editable inputs.
-                 */
-                const buildSlotBar = (id, config) => {
-                    const format = config.format || 'Name | Description | Keywords';
-                    const segments = format.split('|').map(s => s.trim());
-                    // First and last are always fixed (Name / Keywords)
-                    const fixed0 = segments[0] || 'Name';
-                    const fixedLast = segments[segments.length - 1] || 'Keywords';
-                    const middles = segments.length > 2 ? segments.slice(1, -1) : [];
-
-                    const chipStyle = 'display:inline-block; padding:1px 6px; border-radius:10px; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); font-size:0.708em; white-space:nowrap;';
-                    const pipeStyle = 'color:rgba(255,255,255,0.25); font-size:0.708em; padding:0 2px;';
-                    const bracketStyle = 'color:rgba(255,255,255,0.2); font-size:0.708em;';
-                    const inputStyle = 'width:60px; font-size:0.692em; padding:1px 4px; border-radius:10px; background:rgba(0,0,0,0.35); color:var(--rt-text); border:1px solid rgba(255,255,255,0.18); text-align:center; outline:none; min-width:30px; max-width:90px;';
-
-                    const bar = document.createElement('div');
-                    bar.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; gap:2px; margin-bottom:2px; font-family:var(--rt-font-mono);';
-
-                    // [[ TAG:
-                    const open = document.createElement('span');
-                    open.style.cssText = bracketStyle;
-                    open.textContent = `[[${config.tag}: `;
-                    bar.appendChild(open);
-
-                    // Fixed first chip
-                    const chip0 = document.createElement('span');
-                    chip0.style.cssText = chipStyle;
-                    chip0.textContent = fixed0;
-                    chip0.title = 'Fixed — always the entry name';
-                    bar.appendChild(chip0);
-
-                    // Middle slots
-                    middles.forEach((label, idx) => {
-                        const pipe = document.createElement('span');
-                        pipe.style.cssText = pipeStyle;
-                        pipe.textContent = '|';
-                        bar.appendChild(pipe);
-
-                        const inp = document.createElement('input');
-                        inp.type = 'text';
-                        inp.value = label;
-                        inp.title = 'Rename this slot — the AI uses this name to decide what to write here';
-                        inp.style.cssText = inputStyle;
-                        inp.dataset.moduleId = id;
-                        inp.dataset.slotIdx = String(idx);
-                        inp.classList.add('rt-slot-label');
-                        // Size to content dynamically
-                        inp.size = Math.max(4, label.length);
-                        inp.addEventListener('input', () => { inp.size = Math.max(4, inp.value.length || 4); });
-                        bar.appendChild(inp);
-                    });
-
-                    // | Keywords ]]
-                    const pipeLast = document.createElement('span');
-                    pipeLast.style.cssText = pipeStyle;
-                    pipeLast.textContent = '|';
-                    bar.appendChild(pipeLast);
-
-                    const chipLast = document.createElement('span');
-                    chipLast.style.cssText = chipStyle;
-                    chipLast.textContent = fixedLast;
-                    chipLast.title = 'Fixed — always comma-separated search keywords';
-                    bar.appendChild(chipLast);
-
-                    const close = document.createElement('span');
-                    close.style.cssText = bracketStyle;
-                    close.textContent = ']]';
-                    bar.appendChild(close);
-
-                    return bar;
-                };
-
                 Object.entries(s.routerModules || {}).forEach(([id, config]) => {
                     const row = document.createElement('div');
-                    row.style.cssText = 'margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);';
+                    row.style.cssText = 'margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.05);';
 
-                    // Header row: checkbox + tag name + reset button
                     const header = document.createElement('div');
                     header.style.cssText = 'display:flex; align-items:center; gap:4px; margin-bottom:3px;';
                     header.innerHTML = `
-                        <input type="checkbox" class="rt-agent-module-check" data-id="${id}" ${config.enabled ? 'checked' : ''} style="cursor:pointer; margin:0; flex-shrink:0;">
+                        <input type="checkbox" class="rt-agent-module-check" ${config.enabled ? 'checked' : ''} style="cursor:pointer; margin:0; flex-shrink:0;">
                         <span style="font-size:0.769em; font-weight:bold; opacity:0.7; flex:1;">${config.tag}</span>
-                        <button class="rt-agent-module-reset" data-id="${id}" style="background:transparent; border:none; color:var(--rt-accent); cursor:pointer; font-size:0.692em; padding:0 4px; opacity:0.5;" title="Reset slots and instruction to default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                        <button class="rt-agent-module-reset" style="background:transparent; border:none; color:var(--rt-accent); cursor:pointer; font-size:0.692em; padding:0 4px; opacity:0.5;" title="Reset slots and instruction to default"><i class="fa-solid fa-arrow-rotate-left"></i></button>
                     `;
-                    row.appendChild(header);
-
-                    // Inline slot bar
-                    row.appendChild(buildSlotBar(id, config));
-
-                    // Instruction input
-                    const inst = document.createElement('input');
-                    inst.type = 'text';
-                    inst.value = config.instruction || '';
-                    inst.className = 'rt-agent-module-inst';
-                    inst.dataset.id = id;
-                    inst.title = 'Instruction text — guidance about what to write in each slot';
-                    inst.style.cssText = 'width:100%; background:rgba(0,0,0,0.3); color:var(--rt-text); border:1px solid rgba(255,255,255,0.1); border-radius:3px; font-size:0.692em; padding:2px 4px; box-sizing:border-box; margin-top:2px;';
-                    row.appendChild(inst);
-
-                    list.appendChild(row);
-                });
-
-                // ── Event handlers ──────────────────────────────────────────────
-
-                list.querySelectorAll('.rt-agent-module-check').forEach(cb => {
-                    cb.addEventListener('change', (e) => {
-                        const id = (/** @type {HTMLInputElement} */ (e.target)).dataset.id;
-                        const val = (/** @type {HTMLInputElement} */ (e.target)).checked;
-                        const s = getSettings();
-                        s.routerModules[id].enabled = val;
+                    header.querySelector('.rt-agent-module-check').addEventListener('change', (e) => {
+                        const st = getSettings();
+                        st.routerModules[id].enabled = (/** @type {HTMLInputElement} */ (e.target)).checked;
                         saveSettings();
                     });
-                });
-
-                list.querySelectorAll('.rt-agent-module-inst').forEach(input => {
-                    input.addEventListener('change', (e) => {
-                        const target = /** @type {HTMLInputElement} */ (e.target);
-                        const id = target.dataset.id;
-                        const s = getSettings();
-                        s.routerModules[id].instruction = target.value;
-                        saveSettings();
-                    });
-                });
-
-                // Slot label edits — reconstruct format on blur/change
-                list.querySelectorAll('.rt-slot-label').forEach(input => {
-                    const saveSlot = () => {
-                        const el = /** @type {HTMLInputElement} */ (input);
-                        const id = el.dataset.moduleId;
-                        const s = getSettings();
-                        const config = s.routerModules[id];
-                        const format = config.format || 'Name | Description | Keywords';
-                        const segments = format.split('|').map(seg => seg.trim());
-                        const slotIdx = parseInt(el.dataset.slotIdx);
-                        // Middle slots start at segments[1], so offset by 1
-                        segments[slotIdx + 1] = el.value.trim() || segments[slotIdx + 1];
-                        config.format = segments.join(' | ');
-                        saveSettings();
-                    };
-                    input.addEventListener('change', saveSlot);
-                });
-
-                list.querySelectorAll('.rt-agent-module-reset').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const id = (/** @type {HTMLElement} */ (e.currentTarget)).dataset.id;
+                    header.querySelector('.rt-agent-module-reset').addEventListener('click', () => {
                         if (confirm(`Reset ${id.toUpperCase()} module slots and instruction to default?`)) {
-                            const s = getSettings();
-                            const defaults = DEFAULT_MODULES;
-                            if (defaults[id]) {
-                                s.routerModules[id].instruction = defaults[id].instruction;
-                                if (defaults[id].format != null) {
-                                    s.routerModules[id].format = defaults[id].format;
-                                }
+                            const st = getSettings();
+                            if (DEFAULT_MODULES[id]) {
+                                st.routerModules[id].instruction = DEFAULT_MODULES[id].instruction;
+                                if (DEFAULT_MODULES[id].format != null) st.routerModules[id].format = DEFAULT_MODULES[id].format;
                                 saveSettings();
                                 renderAgentModules();
                             }
                         }
                     });
+                    row.appendChild(header);
+
+                    row.appendChild(buildSlotBar(config.tag, config.format || 'Name | Description | Keywords', (nf) => {
+                        const st = getSettings();
+                        st.routerModules[id].format = nf;
+                        saveSettings();
+                    }));
+
+                    const inst = document.createElement('input');
+                    inst.type = 'text';
+                    inst.value = config.instruction || '';
+                    inst.title = 'Instruction text — guidance about what to write in each slot';
+                    inst.style.cssText = 'width:100%; background:rgba(0,0,0,0.3); color:var(--rt-text); border:1px solid rgba(255,255,255,0.1); border-radius:3px; font-size:0.692em; padding:2px 4px; box-sizing:border-box; margin-top:2px;';
+                    inst.addEventListener('change', () => {
+                        const st = getSettings();
+                        st.routerModules[id].instruction = inst.value;
+                        saveSettings();
+                    });
+                    row.appendChild(inst);
+                    list.appendChild(row);
                 });
             };
             renderAgentModules();
@@ -3000,35 +2995,63 @@ Rules:
                 const list = agentPanel.querySelector('#rt-agent-custom-tags-list');
                 if (!list) return;
                 list.innerHTML = '';
-                (s.routerCustomTags || []).forEach((tag, idx) => {
-                    const row = document.createElement('div');
-                    row.style.cssText = 'display: flex; gap: 2px; margin-bottom: 2px; align-items: center;';
-                    row.innerHTML = `
-                        <input type="text" value="${tag.tag}" class="rt-custom-tag-name" data-idx="${idx}" placeholder="TAG" style="width: 60px; background: #111; color: #ddd; border: 1px solid #333; font-size: 0.769em; padding: 1px;">
-                        <input type="text" value="${tag.instruction}" class="rt-custom-tag-inst" data-idx="${idx}" placeholder="Instructions..." style="flex: 1; background: #111; color: #ddd; border: 1px solid #333; font-size: 0.769em; padding: 1px;">
-                        <button class="rt-custom-tag-del" data-idx="${idx}" style="background: #422; color: #f99; border: none; font-size: 0.769em; cursor: pointer; padding: 1px 4px;">✕</button>
-                    `;
-                    list.appendChild(row);
-                });
 
-                list.querySelectorAll('input').forEach(input => {
-                    input.addEventListener('change', (e) => {
-                        const target = /** @type {HTMLInputElement} */ (e.target);
-                        const idx = parseInt(target.dataset.idx);
-                        const s = getSettings();
-                        if (target.classList.contains('rt-custom-tag-name')) s.routerCustomTags[idx].tag = target.value.toUpperCase();
-                        else s.routerCustomTags[idx].instruction = target.value;
+                (s.routerCustomTags || []).forEach((tag, idx) => {
+                    const fmt = tag.format || 'Name | Description | Keywords';
+                    const row = document.createElement('div');
+                    row.style.cssText = 'margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.05);';
+
+                    const header = document.createElement('div');
+                    header.style.cssText = 'display:flex; align-items:center; gap:4px; margin-bottom:3px;';
+
+                    const tagInp = document.createElement('input');
+                    tagInp.type = 'text';
+                    tagInp.value = tag.tag;
+                    tagInp.placeholder = 'TAG';
+                    tagInp.style.cssText = 'width:60px; flex-shrink:0; background:rgba(0,0,0,0.3); color:var(--rt-text); border:1px solid rgba(255,255,255,0.1); border-radius:3px; font-size:0.769em; font-weight:bold; padding:1px 4px; box-sizing:border-box;';
+                    tagInp.addEventListener('change', () => {
+                        const st = getSettings();
+                        st.routerCustomTags[idx].tag = tagInp.value.toUpperCase();
                         saveSettings();
                     });
-                });
-                list.querySelectorAll('.rt-custom-tag-del').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const idx = parseInt((/** @type {HTMLElement} */ (e.currentTarget)).dataset.idx);
-                        const s = getSettings();
-                        s.routerCustomTags.splice(idx, 1);
+                    header.appendChild(tagInp);
+
+                    const spacer = document.createElement('span');
+                    spacer.style.flex = '1';
+                    header.appendChild(spacer);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.style.cssText = 'background:#422; color:#f99; border:none; font-size:0.692em; cursor:pointer; padding:1px 6px; border-radius:3px;';
+                    delBtn.title = 'Delete this custom tag';
+                    delBtn.textContent = '✕';
+                    delBtn.addEventListener('click', () => {
+                        const st = getSettings();
+                        st.routerCustomTags.splice(idx, 1);
                         saveSettings();
                         renderAgentCustomTags();
                     });
+                    header.appendChild(delBtn);
+                    row.appendChild(header);
+
+                    row.appendChild(buildSlotBar(tag.tag || 'CUSTOM', fmt, (nf) => {
+                        const st = getSettings();
+                        st.routerCustomTags[idx].format = nf;
+                        saveSettings();
+                    }));
+
+                    const inst = document.createElement('input');
+                    inst.type = 'text';
+                    inst.value = tag.instruction || '';
+                    inst.placeholder = 'Instructions for this tag...';
+                    inst.title = 'Instruction text — guidance about what to write in each slot';
+                    inst.style.cssText = 'width:100%; background:rgba(0,0,0,0.3); color:var(--rt-text); border:1px solid rgba(255,255,255,0.1); border-radius:3px; font-size:0.692em; padding:2px 4px; box-sizing:border-box; margin-top:2px;';
+                    inst.addEventListener('change', () => {
+                        const st = getSettings();
+                        st.routerCustomTags[idx].instruction = inst.value;
+                        saveSettings();
+                    });
+                    row.appendChild(inst);
+                    list.appendChild(row);
                 });
             };
 
@@ -3037,7 +3060,7 @@ Rules:
                 addTagBtn.addEventListener('click', () => {
                     const s = getSettings();
                     if (!s.routerCustomTags) s.routerCustomTags = [];
-                    s.routerCustomTags.push({ tag: 'NEW_TAG', instruction: 'New instructions...' });
+                    s.routerCustomTags.push({ tag: 'NEW_TAG', instruction: 'New instructions...', format: 'Name | Description | Keywords' });
                     saveSettings();
                     renderAgentCustomTags();
                 });

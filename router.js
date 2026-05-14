@@ -295,7 +295,7 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
                 if (config.enabled) formatLines.push(`- [[${config.tag}: ${config.format}]] (${config.instruction})`);
             }
             for (const custom of customTags) {
-                formatLines.push(`- [[${custom.tag}: Name | Description | Keywords]] (${custom.instruction})`);
+                formatLines.push(`- [[${custom.tag}: ${custom.format || 'Name | Description | Keywords'}]] (${custom.instruction})`);
             }
             formatLines.push(`- [[ACTIVATE: Name]] (Bring entry to active memory)`);
             formatLines.push(`- [[DEACTIVATE: Name]] (Remove from active memory)`);
@@ -1113,19 +1113,6 @@ function parseBasicTags(text, archiveBooks) {
                     }
                 }
             }
-        } else if (tagName === 'QUEST' && parts.length >= 3) {
-            const name = parts[0];
-            const loc = parts[1];
-            const desc = parts[2];
-            const keywords = parts[3] || '';
-            processMatch(name, `[Location: ${loc}] ${desc}`, keywords, 'QUEST');
-        } else if (tagName === 'FAC' && parts.length >= 4) {
-            const name = parts[0];
-            const status = parts[1];
-            const desc = parts[2];
-            const keywords = parts[3];
-            const body = [status, desc].filter(Boolean).join('\n\n');
-            processMatch(name, body, keywords, 'FAC');
         } else if (parts.length >= 3) {
             // Generic: first = name, last = keywords, everything in between = body (joined with blank line).
             // Supports any number of middle slots so renaming or adding slots in the UI works automatically.
