@@ -286,12 +286,12 @@ export function installInterceptor() {
 
 
 
-        // Pre-generation keyword scan: scan the user's outgoing message NOW so any
-        // keyword matches update activeRouterKeys before the prompt manager injects lore.
-        // Runs regardless of whether there are other injections — must fire on EVERY send.
-        // sweepEnabled=false: skip the auto-expiry sweep here — that runs onGenerationEnded.
+        // Pre-generation keyword scan + same-turn lore injection.
+        // The PromptManager builds the prompt BEFORE this interceptor runs, so updating
+        // activeRouterKeys is always one turn late on that path.
+        // Fix: entries activated THIS scan are injected directly into the user message —
+        // the same pattern as state memo and quests — guaranteeing same-turn presence.
         if (settings.routerEnabled) {
-            // content is the raw user message — injections haven't been applied yet.
             if (content) {
                 const t0 = performance.now().toFixed(1);
                 console.group(`[RPG|INTERCEPT] rpgTrackerInterceptor keyword pre-scan @ ${t0}ms`);
@@ -300,6 +300,28 @@ export function installInterceptor() {
                 console.log('activeRouterKeys AFTER scan:', JSON.stringify(settings.activeRouterKeys || []));
                 console.log('newly triggered this scan:', triggered);
                 console.log(`scan finished @ ${performance.now().toFixed(1)}ms`);
+
+                if (triggered.length > 0) {
+                    try {
+                        const ctx = SillyTavern.getContext();
+                        let loreBlock = '';
+                        const bookCache = {};
+                        for (const id of triggered) {
+                            const [bookName, uid] = id.split('::');
+                            if (!bookCache[bookName]) bookCache[bookName] = await ctx.loadWorldInfo(bookName);
+                            const entry = bookCache[bookName]?.entries?.[uid];
+                            if (entry?.content) {
+                                loreBlock += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
+                            }
+                        }
+                        if (loreBlock) {
+                            injections += `\n## NEWLY ACTIVATED LORE (KEYWORD MATCH)\n${loreBlock.trim()}\n`;
+                            console.log(`[RPG|INTERCEPT] Same-turn lore injected for ${triggered.length} entries.`);
+                        }
+                    } catch (e) {
+                        console.warn('[RPG Tracker] Same-turn lore injection failed:', e);
+                    }
+                }
                 console.groupEnd();
             }
         }
@@ -316,6 +338,7 @@ export function installInterceptor() {
         }
     };
 }
+
 
 // ── Narrative collector ────────────────────────────────────────────────────────
 
