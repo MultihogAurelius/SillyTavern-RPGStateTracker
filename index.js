@@ -2921,7 +2921,9 @@ Rules:
                 books[bookName] = await ctx.loadWorldInfo(bookName);
             }
 
-            const keywordTriggeredSet = new Set(s.lastKeywordTriggeredKeys || []);
+            // Use keywordActivatedKeys (persistent pool) for yellow pill coloring.
+            // lastKeywordTriggeredKeys only covers the most recent scan pass and resets immediately.
+            const keywordTriggeredSet = new Set(s.keywordActivatedKeys || []);
 
             keysContainer.innerHTML = activeKeys.map(k => {
                 const [bookName, uid] = k.split('::');
@@ -2970,6 +2972,9 @@ Rules:
                     const st = getSettings();
                     if (st.activeRouterKeys) {
                         st.activeRouterKeys = st.activeRouterKeys.filter(k => k !== key);
+                        if (st.keywordActivatedKeys) {
+                            st.keywordActivatedKeys = st.keywordActivatedKeys.filter(k => k !== key);
+                        }
                         if (st.lastKeywordTriggeredKeys) {
                             st.lastKeywordTriggeredKeys = st.lastKeywordTriggeredKeys.filter(k => k !== key);
                         }
