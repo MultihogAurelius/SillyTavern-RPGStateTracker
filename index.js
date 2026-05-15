@@ -669,7 +669,14 @@ import { getRequestHeaders } from '../../../../script.js';
         if (typeof addPromptManagerInterceptor === 'function') {
             addPromptManagerInterceptor(async (prompt) => {
                 const s = getSettings();
-                if (!s.routerEnabled || !s.activeRouterKeys?.length) return;
+                const t = performance.now().toFixed(1);
+                console.group(`[RPG|LORE-INJECT] promptManagerInterceptor fired @ ${t}ms`);
+                console.log('activeRouterKeys at inject time:', JSON.stringify(s.activeRouterKeys || []));
+                if (!s.routerEnabled || !s.activeRouterKeys?.length) {
+                    console.log('→ Skipped (disabled or empty)');
+                    console.groupEnd();
+                    return;
+                }
                 // Reuse the same logic but for the prompt object
                 let injectedContext = "";
                 const books = {};
@@ -687,8 +694,13 @@ import { getRequestHeaders } from '../../../../script.js';
                     const sysPart = prompt.find(p => p.role === 'system');
                     if (sysPart) sysPart.content += routerBlock;
                     else prompt.unshift({ role: 'system', content: routerBlock });
+                    console.log(`→ Injected ${s.activeRouterKeys.length} entries into prompt`);
+                } else {
+                    console.log('→ No content to inject (entries empty?)');
                 }
+                console.groupEnd();
             });
+            console.debug('[RPG Tracker] Lore injection: addPromptManagerInterceptor path active.');
         } else {
             // Fallback to the persistent extension prompt system
             console.debug('[RPG Tracker] Active lore injection uses setExtensionPrompt (no addPromptManagerInterceptor in this SillyTavern build).');

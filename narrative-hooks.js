@@ -293,7 +293,14 @@ export function installInterceptor() {
         if (settings.routerEnabled) {
             // content is the raw user message — injections haven't been applied yet.
             if (content) {
-                await scanAssistantOutputForKeywords(content, { sweepEnabled: false }).catch(() => {});
+                const t0 = performance.now().toFixed(1);
+                console.group(`[RPG|INTERCEPT] rpgTrackerInterceptor keyword pre-scan @ ${t0}ms`);
+                console.log('activeRouterKeys BEFORE scan:', JSON.stringify(settings.activeRouterKeys || []));
+                const triggered = await scanAssistantOutputForKeywords(content, { sweepEnabled: false }).catch(() => []);
+                console.log('activeRouterKeys AFTER scan:', JSON.stringify(settings.activeRouterKeys || []));
+                console.log('newly triggered this scan:', triggered);
+                console.log(`scan finished @ ${performance.now().toFixed(1)}ms`);
+                console.groupEnd();
             }
         }
 
