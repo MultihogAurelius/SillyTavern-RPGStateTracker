@@ -1413,7 +1413,11 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
     }
 
     // ── Forward pass: activate entries whose keywords appear in the new narrative ──
+    // ── or in the recent history window (Retroactive Lookback).            ──
     const lowerText = narrativeText.toLowerCase();
+    const chat = ctx.chat || [];
+    const recentMessages = chat.filter(m => !m.is_system); // exclude system messages
+
     const currentActive = new Set(settings.activeRouterKeys || []);
     const currentKeyword = new Set(settings.keywordActivatedKeys || []);
     const newlyTriggered = [];
@@ -1432,10 +1436,24 @@ export async function scanAssistantOutputForKeywords(narrativeText, opts = {}) {
             if (currentActive.has(fullId)) continue; // already active — skip
 
             const keywords = Array.isArray(entry.key) ? entry.key : [];
-            const matched = keywords.some(kw =>
+            if (keywords.length === 0) continue;
+
+            // Check the current narrative text (discovery)
+            let matched = keywords.some(kw =>
                 typeof kw === 'string' && kw.length > 0 &&
                 lowerText.includes(kw.toLowerCase())
             );
+
+            // Retroactive lookback: check history window if not matched in the current text
+            if (!matched) {
+                const depth = (typeof entry.depth === 'number' && entry.depth > 0) ? entry.depth : (book.scan_depth ?? 4);
+                const window = recentMessages.slice(-depth);
+                const windowText = window.map(m => (m.mes || m.content || '')).join(' ').toLowerCase();
+                matched = keywords.some(kw =>
+                    typeof kw === 'string' && kw.length > 0 &&
+                    windowText.includes(kw.toLowerCase())
+                );
+            }
 
             if (matched) {
                 currentActive.add(fullId);
