@@ -89,8 +89,8 @@ Example:
 [/INVENTORY]`,
     abilities: `Non-spell class features and active abilities ONLY (e.g. Lay on Hands, Action Surge). NEVER mix these with spells. Format each entry as: \`Ability Name (brief description)\`.`,
     spells: "Spell slots and spells known, grouped by level. Format each line as: `Level N (avail/max): Spell1, Spell2`. For cantrips, use `Cantrips: Spell1, Spell2`. Track slot usage accurately. NEVER mix these with abilities.",
-    time: `Current time, day, and location grabbed from the status footer (e.g. 'Location: Northern Iron Reach, Khelt, Fourth Tier, Workshop 17-C'). Also track time of the last rest (e.g. 'Last Rest: 10:00 PM, Day 0'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
-
+    time: `Current time and day grabbed from the status footer. Also track time of the last rest (e.g. 'Last Rest: 10:00 PM, Day 0'). Use this to track out-of-combat buff durations by comparing to the PRIOR MEMO's time.
+    
 'Last Rest' is ONLY triggered on Long Rest, NOT Short Rest (when Hit Dice, etc, are spent.) If the [TIME] delta between PREVIOUS STATE MEMO and your current update is only an hour, it is a Short Rest.`,
     xp: "Character Level and Experience Points (XP). Format as `Level: X | XP: current/max`. You MUST output this field whenever the narrative mentions gaining experience or leveling up.",
     quests: `Quest status updates ONLY. When a quest objective is completed or a quest concludes, emit a [QUESTS] block containing ONLY a JSON object with an "updates" array. Each entry must have the quest "id" and only the fields that changed: "status" (active/completed/failed), "difficulty", and/or "objectives" (array of {"id", "status", "progress"}). For quantity-based objectives (e.g. "collect 6 mushrooms"), include "progress" as the current count (e.g. 4) even if the objective is not yet completed. NOTE: Do NOT fail quests for time-out/deadline reasons (the system handles those automatically), but YOU MUST mark a quest as "failed" if it becomes narratively impossible (e.g. a protection target dies). Do NOT re-emit the full quest schema. If no quest changed, omit this block entirely.`,
