@@ -355,6 +355,33 @@ export function installInterceptor() {
                     }
                 }
 
+                // Inject agent-activated lore (grey pills): entries in activeRouterKeys that are
+                // NOT in the keyword pools. These were added by the Agent or Direct Command.
+                // They are disable:true in the lorebook so ST's native scanner ignores them.
+                // Neither of the keyword passes above covers them — this pass fills the gap.
+                const alreadyInjected = new Set([...triggered, ...(settings.keywordActivatedKeys || [])]);
+                const agentOwned = (settings.activeRouterKeys || []).filter(id => !alreadyInjected.has(id));
+                if (agentOwned.length > 0) {
+                    try {
+                        const ctx = SillyTavern.getContext();
+                        let agentBlock = '';
+                        const bookCache = {};
+                        for (const id of agentOwned) {
+                            const [bookName, uid] = id.split('::');
+                            if (!bookCache[bookName]) bookCache[bookName] = await ctx.loadWorldInfo(bookName);
+                            const entry = bookCache[bookName]?.entries?.[uid];
+                            if (entry?.content) {
+                                agentBlock += `### [${entry.key?.[0] || entry.comment || uid}]\n${entry.content}\n\n`;
+                            }
+                        }
+                        if (agentBlock) {
+                            injections += `\n## ACTIVE LORE (AGENT)\n${agentBlock.trim()}\n`;
+                        }
+                    } catch (e) {
+                        console.warn('[RPG Tracker] Agent-owned lore injection failed:', e);
+                    }
+                }
+
                 console.groupEnd();
             }
         }
