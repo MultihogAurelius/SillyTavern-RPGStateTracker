@@ -2,6 +2,22 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.3.7] - 2026-05-17
+
+### Added
+- **Immersion Mode Collapsibility**: Both the RPG State Tracker and Lorebook Agent panels can now be fully collapsed to their header bars by clicking the header collapse button or double-clicking the header.
+- **Auto-Expansion Synergy**: Opening the Lorebook Agent panel automatically expands the main RPG Tracker panel if it is collapsed, preventing child element clipping.
+
+### Changed
+- **Mobile UI Spacing Optimization**:
+    - Hid the on/off (power) buttons (`⏻`) exclusively on mobile viewports to reclaim precious screen real estate.
+    - Vertically enlarged the header bars for a more prominent, premium look on mobile screens.
+    - Scaled up the other action buttons and increased icon sizes for highly comfortable touch interactions.
+
+### Fixed
+- **Stale Collapsed Heights**: Added min-height guards on startup to prevent restoring a collapsed header height (from stale pre-collapse session geometry) as the default expanded height.
+- **High-Specificity CSS Override**: Resolved a CSS clash where a specific ID-based display: block !important rule prevented the Lorebook Agent's content container from collapsing.
+
 ## [2.3.6] - 2026-05-16
 
 ### Fixed
