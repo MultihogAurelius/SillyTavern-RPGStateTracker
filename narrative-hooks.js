@@ -482,11 +482,30 @@ export function resetRouterTick(clearKeywordPool = false) {
 export async function onGenerationEnded() {
     const settings = getSettings();
     const isStateRunning = typeof globalThis._rpgStateModelRunning === 'function' && globalThis._rpgStateModelRunning();
+
+    console.log(
+        `%c[RPG Tracker Hooks] onGenerationEnded entered%c\n` +
+        `settings.enabled: ${settings.enabled}\n` +
+        `settings.paused: ${settings.paused}\n` +
+        `isStateRunning: ${isStateRunning}`,
+        'color: #ff9900; font-weight: bold; background: #222; padding: 2px 5px; border-radius: 3px;',
+        'color: inherit;'
+    );
+
     if (!settings.enabled || settings.paused || isStateRunning) return;
 
     const ctx = SillyTavern.getContext();
     const { chat } = ctx;
     const combinedNarrative = getNarrativeBlocks(chat, -1, !!settings.routerIncludeHidden);
+
+    console.log(
+        `%c[RPG Tracker Hooks] post-early exits%c\n` +
+        `combinedNarrative: "${(combinedNarrative || '').slice(0, 100)}..."\n` +
+        `chat length: ${chat ? chat.length : 0}`,
+        'color: #ff6600; font-weight: bold; background: #222; padding: 2px 5px; border-radius: 3px;',
+        'color: inherit;'
+    );
+
     if (!combinedNarrative) return;
 
     // ── Swipe detection ────────────────────────────────────────────────────────
@@ -496,26 +515,42 @@ export async function onGenerationEnded() {
     const lastMsg = chat[chat.length - 1];
     const isSwipe = lastMsg && typeof lastMsg.swipe_id === 'number' && lastMsg.swipe_id > 0;
 
+    console.log(
+        `%c[RPG Tracker Hooks] Swipe Check Outcome%c\n` +
+        `lastMsg exists: ${!!lastMsg}\n` +
+        `lastMsg.swipe_id: ${lastMsg ? lastMsg.swipe_id : 'n/a'} (type: ${lastMsg ? typeof lastMsg.swipe_id : 'n/a'})\n` +
+        `isSwipe: ${isSwipe}\n` +
+        `routerAutoRollbackOnSwipe toggle: ${settings.routerAutoRollbackOnSwipe}`,
+        'color: #00ccff; font-weight: bold; background: #222; padding: 2px 5px; border-radius: 3px;',
+        'color: inherit;'
+    );
+
     if (isSwipe && settings.routerAutoRollbackOnSwipe) {
-        if (settings.debugMode) console.log('[RPG Tracker] Swipe detected — auto-rolling back State Tracker and Lorebook Agent.');
+        console.log('%c[RPG Tracker Hooks] Executing Auto-Rollback on Swipe...', 'color: #ff3330; font-weight: bold;');
 
         // 1. State Tracker rollback: restore to the memo from before the last generation.
         //    memoHistory[0] = live state after last gen, memoHistory[1] = state before it.
         if (settings.memoHistory && settings.memoHistory.length > 1) {
+            const beforeShiftLen = settings.memoHistory.length;
             const previousMemo = settings.memoHistory[1];
             // Remove the generation that's being replaced
             settings.memoHistory.shift();
             settings.currentMemo = settings.memoHistory[0] ?? previousMemo;
             settings.historyIndex = 0;
-            if (settings.debugMode) console.log('[RPG Tracker] State Tracker rolled back one generation.');
+            console.log(`[RPG Tracker Hooks] State Tracker rolled back. Length went from ${beforeShiftLen} to ${settings.memoHistory.length}. New currentMemo size: ${settings.currentMemo.length} chars.`);
             // Notify the UI
             if (typeof globalThis._rpgSyncMemoView === 'function') globalThis._rpgSyncMemoView();
+        } else {
+            console.warn('[RPG Tracker Hooks] State Tracker rollback skipped: memoHistory is empty or too short.', settings.memoHistory);
         }
 
         // 2. Lorebook Agent rollback: restore the most recent agent pass snapshot.
         if ((settings.routerHistory || []).length > 0) {
+            console.log(`[RPG Tracker Hooks] Lorebook Agent rollback starting. History length: ${settings.routerHistory.length}`);
             const ok = await rollbackRouterPass(0);
-            if (settings.debugMode) console.log('[RPG Tracker] Lorebook Agent rollback:', ok ? 'success' : 'failed or nothing to restore');
+            console.log('[RPG Tracker Hooks] Lorebook Agent rollback result:', ok ? 'success' : 'failed or nothing to restore');
+        } else {
+            console.warn('[RPG Tracker Hooks] Lorebook Agent rollback skipped: routerHistory is empty.');
         }
     }
     // ── End swipe detection ────────────────────────────────────────────────────
