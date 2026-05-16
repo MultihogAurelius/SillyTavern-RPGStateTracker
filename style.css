@@ -1417,8 +1417,8 @@
 
     /* Squeeze header elements on mobile screens to prevent button overflow/cutoff */
     .rpg-tracker-header {
-        padding: 5px 8px !important;
-        font-size: 0.84em !important;
+        padding: 10px 8px !important; /* Vertically larger bar on mobile */
+        font-size: 0.9em !important;
         gap: 6px !important;
     }
 
@@ -1439,13 +1439,20 @@
     }
 
     .rpg-tracker-header-right {
-        gap: 3px !important;
+        gap: 4px !important;
         flex-shrink: 0 !important;
     }
 
+    /* Hide the on/off (power) buttons on mobile screens to free up space */
+    #rpg-tracker-enable-btn,
+    #rt-agent-router-enable-btn {
+        display: none !important;
+    }
+
+    /* Make other header buttons larger and easier to tap on mobile */
     .rpg-tracker-icon-btn {
-        padding: 2px 4px !important;
-        font-size: 0.88em !important;
+        padding: 4px 6px !important;
+        font-size: 1.05em !important;
     }
 }
 
