@@ -3116,13 +3116,13 @@ Rules:
                 const s = getSettings();
                 s.agentCollapsed = !s.agentCollapsed;
                 saveSettings();
-                
+
                 if (s.agentCollapsed) {
                     agentPanel.classList.add('rt-panel-collapsed');
                 } else {
                     agentPanel.classList.remove('rt-panel-collapsed');
                 }
-                
+
                 const icon = agentPanel.querySelector('#rt-agent-router-collapse-btn i');
                 if (icon) {
                     icon.className = s.agentCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
