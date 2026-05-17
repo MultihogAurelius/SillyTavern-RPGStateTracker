@@ -2,6 +2,11 @@
 
 All notable changes to the **Fatbody D&D Framework** will be documented in this file.
 
+## [2.3.8] - 2026-05-17
+
+### Added
+- **Clone Stack**: New "Clone Stack" button in the Lorebook Agent settings. Duplicates every lorebook in the active campaign stack (e.g. `Eldoria_NPCs`, `Eldoria_Locations`) under a new user-specified prefix. Designed to prepare a parallel lorebook set before creating a SillyTavern branch chat — name the branch to match the new prefix and the framework links it automatically.
+
 ## [2.3.7] - 2026-05-17
 
 ### Added

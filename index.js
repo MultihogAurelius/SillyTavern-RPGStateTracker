@@ -524,6 +524,137 @@ import { getRequestHeaders } from '../../../../script.js';
         return bookNames.length;
     }
 
+    /**
+     * Duplicates every lorebook in the current campaign stack under a new prefix.
+     * Each book like `OldPrefix_NPCs` becomes `NewPrefix_NPCs`.
+     * If the book name IS the prefix (the root book), it becomes `NewPrefix`.
+     * @returns {Promise<void>}
+     */
+    async function cloneCampaignStack() {
+        const s = getSettings();
+        const ctx = SillyTavern.getContext();
+
+        // 1. Determine current prefix
+        const currentPrefix = s.routerCampaignPrefix || '';
+        if (!currentPrefix) {
+            toastr['warning']('No campaign prefix is active. Activate the Lorebook Agent and load a chat first.', 'Clone Stack');
+            return;
+        }
+
+        // 2. Ask user for the new prefix
+        let newPrefixRaw = '';
+        try {
+            newPrefixRaw = await ctx.Popup.show.input(
+                'Clone Lorebook Stack',
+                `<p>All lorebooks under prefix <strong>${currentPrefix}</strong> will be duplicated.</p>` +
+                `<p>Enter the new prefix for the cloned stack (e.g. <code>Eldoria_Branch1</code>).<br>` +
+                `<small>After cloning, create your branch chat using the same name so the framework links automatically.</small></p>`,
+                ''
+            );
+        } catch (_) {
+            // User cancelled
+            return;
+        }
+
+        if (!newPrefixRaw && newPrefixRaw !== 0) return; // cancelled
+        const newPrefix = sanitizeCampaignPrefixString(String(newPrefixRaw).trim());
+        if (!newPrefix) {
+            toastr['warning']('New prefix cannot be empty or contain only special characters.', 'Clone Stack');
+            return;
+        }
+        if (newPrefix === currentPrefix) {
+            toastr['warning']('New prefix is the same as the current prefix. Please choose a different name.', 'Clone Stack');
+            return;
+        }
+
+        // 3. Discover all books that belong to the current prefix
+        const reg = await refreshWorldInfoRegistry();
+        const allNames = resolveAllWorldNames(ctx, reg);
+        const matchingBooks = allNames.filter(n => bookBelongsToPrefix(n, currentPrefix));
+
+        if (matchingBooks.length === 0) {
+            toastr['warning'](`No lorebooks found for prefix "${currentPrefix}". Nothing to clone.`, 'Clone Stack');
+            return;
+        }
+
+        toastr['info'](`Cloning ${matchingBooks.length} lorebook(s) to prefix "${newPrefix}"…`, 'Clone Stack');
+
+        // 4. Clone each book under the new prefix name
+        let cloned = 0;
+        const errors = [];
+
+        for (const bookName of matchingBooks) {
+            // Derive new name: replace the old prefix at the start of the book name
+            let newBookName;
+            if (bookName === currentPrefix) {
+                // Root book: OldPrefix → NewPrefix
+                newBookName = newPrefix;
+            } else {
+                // Suffixed book: OldPrefix_Suffix → NewPrefix_Suffix
+                const suffix = bookName.slice(currentPrefix.length); // includes leading '_'
+                newBookName = newPrefix + suffix;
+            }
+
+            // Load existing book data
+            let bookData = null;
+            try {
+                bookData = await ctx.loadWorldInfo(bookName);
+            } catch (e) {
+                errors.push(`Failed to load "${bookName}": ${e?.message || e}`);
+                continue;
+            }
+
+            if (!bookData) {
+                errors.push(`Could not read "${bookName}" — skipping.`);
+                continue;
+            }
+
+            // Deep clone and update name
+            const cloneData = JSON.parse(JSON.stringify(bookData));
+            cloneData.name = newBookName;
+
+            // Write to disk via the raw API (same pattern as router.js)
+            try {
+                const res = await fetch('/api/worldinfo/edit', {
+                    method: 'POST',
+                    headers: getRequestHeaders(),
+                    body: JSON.stringify({ name: newBookName, data: cloneData }),
+                });
+                if (!res.ok) {
+                    errors.push(`HTTP ${res.status} saving "${newBookName}"`);
+                    continue;
+                }
+                // Sync ST in-memory cache
+                if (typeof ctx.saveWorldInfo === 'function') {
+                    try { await ctx.saveWorldInfo(newBookName, cloneData); } catch (_) { /* non-fatal */ }
+                }
+                cloned++;
+            } catch (e) {
+                errors.push(`Failed to write "${newBookName}": ${e?.message || e}`);
+            }
+        }
+
+        // 5. Refresh ST's world-info list so the new books appear immediately
+        if (typeof ctx.updateWorldInfoList === 'function') {
+            try { await ctx.updateWorldInfoList(); } catch (_) { /* non-fatal */ }
+        }
+
+        // 6. Report result
+        if (errors.length === 0) {
+            toastr['success'](
+                `Cloned ${cloned} lorebook${cloned === 1 ? '' : 's'} → prefix "${newPrefix}".\n` +
+                `Now create a branch named "${newPrefix}" (or set the prefix override to "${newPrefix}") to link it.`,
+                'Clone Stack',
+                { timeOut: 8000 }
+            );
+        } else {
+            toastr['warning'](
+                `Cloned ${cloned}/${matchingBooks.length} books. Errors:\n${errors.join('\n')}`,
+                'Clone Stack',
+                { timeOut: 10000 }
+            );
+        }
+    }
 
 
     // ── Chat-Linked State (deferred from state-manager.js — touches DOM + _historyViewIndex) ──
@@ -6835,6 +6966,16 @@ Rules:
                     toastr['success'](`Activated ${count} campaign lorebook${count === 1 ? '' : 's'}.`);
                 } catch (e) {
                     toastr['error']('Failed to activate campaign lorebooks.');
+                } finally {
+                    btn.prop('disabled', false);
+                }
+            });
+
+            $('#rpg_tracker_clone_stack_btn').on('click', async function () {
+                const btn = $(this);
+                btn.prop('disabled', true);
+                try {
+                    await cloneCampaignStack();
                 } finally {
                     btn.prop('disabled', false);
                 }
