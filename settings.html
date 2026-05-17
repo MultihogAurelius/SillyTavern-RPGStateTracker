@@ -244,9 +244,9 @@
                     <b>Advanced Options</b>
                     <div class="flex-container flexFlowColumn gap-1">
                         <label>Message Lookback</label>
-                        <input id="rpg_tracker_lookback_messages" type="number" class="text_pole" value="2" />
+                        <input id="rpg_tracker_lookback_messages" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="2" />
                         <label>History Context (States)</label>
-                        <input id="rpg_tracker_history_count" type="number" class="text_pole" value="1" />
+                        <input id="rpg_tracker_history_count" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" value="1" />
                     </div>
                 </div>
             </div>
@@ -311,9 +311,9 @@
                                     <select id="rpg_tracker_router_completion_preset" class="text_pole"></select>
 
                                     <label>Max Agent Turns</label>
-                                    <input id="rpg_tracker_router_max_turns" type="number" class="text_pole" min="1" max="50" />
+                                    <input id="rpg_tracker_router_max_turns" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="1" max="50" />
                                     <label>Context Lookback (user/assistant)</label>
-                                    <input id="rpg_tracker_router_lookback" type="number" class="text_pole" min="1" max="100" title="Last N chat messages in order (both user and assistant)." />
+                                    <input id="rpg_tracker_router_lookback" type="text" inputmode="numeric" pattern="[0-9]*" class="text_pole" min="1" max="100" title="Last N chat messages in order (both user and assistant)." />
                                 </div>
                             </div>
                         </div>

@@ -3,6 +3,7 @@ import { sendStateRequest, sendAgentTurn } from './llm-client.js';
 import { getRequestHeaders } from '../../../../script.js';
 
 let _routerRunning = false;
+let _routerNormalRunCount = 0; // tracks completed normal (non-cleanup) passes for auto-cleanup interval
 
 /** Returns true while a router pass is actively running. */
 export function isRouterRunning() { return _routerRunning; }
@@ -275,8 +276,349 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
             .replace(/\{\{campaignRoot\}\}/g, prefix || 'World Chronicle')
             .replace(/\{\{user\}\}/g, ctx.name1 || 'User');
 
+        // ── Cleanup Mode ─────────────────────────────────────────────────────
+        // Triggered by the UI broom button via runRouterPass(null, '__CLEANUP__', null, true).
+        // ── Cleanup Mode ─────────────────────────────────────────────────────
+        // Triggered by the UI broom button or Clean per-entry buttons.
+        // Bypasses all normal research logic; uses stripped prompts and rewrite/consolidate only.
+        const isCleanupPass = isManual && (manualPrompt || '').startsWith('__CLEANUP__');
+        const CLEANUP_TOKEN_THRESHOLD = settings.routerCleanupTokenThreshold || 300; // ~1200 chars — entries larger than this are flagged
+
+        if (isCleanupPass) {
+            let targetEntryId = null;
+            let customInstructions = null;
+
+            // Format parser:
+            // __CLEANUP__::[BookName]::[UID]::[Instructions]
+            // Or: __CLEANUP__::::[Instructions]
+            const cleanupParts = manualPrompt.split('::');
+            if (cleanupParts.length > 1) {
+                const b = cleanupParts[1]?.trim();
+                const u = cleanupParts[2]?.trim();
+                if (b && u) {
+                    targetEntryId = `${b}::${u}`;
+                }
+                // Custom instructions is everything after target, or after double colon
+                if (b && u && cleanupParts.length >= 4) {
+                    customInstructions = cleanupParts.slice(3).join('::').trim();
+                } else if (!b && !u && cleanupParts.length >= 3) {
+                    customInstructions = cleanupParts.slice(2).join('::').trim();
+                }
+            }
+
+            if (targetEntryId) {
+                broadcastStep('thought', `Cleanup mode: targeted compression for "${targetEntryId}"...`);
+            } else {
+                broadcastStep('thought', 'Cleanup mode: scanning for bloated entries...');
+            }
+
+            const flagged = [];
+            for (const [bookName, book] of Object.entries(archiveBooks)) {
+                if (!book?.entries) continue;
+                for (const [uid, entry] of Object.entries(book.entries)) {
+                    const fullId = `${bookName}::${uid}`;
+                    const tokens = estimateTokens(entry.content);
+                    const useThreshold = settings.routerCleanupUseThreshold !== false;
+                    const isTarget = targetEntryId && fullId === targetEntryId;
+                    const overThreshold = !useThreshold || tokens >= CLEANUP_TOKEN_THRESHOLD;
+
+                    if (isTarget || (!targetEntryId && overThreshold)) {
+                        const lines = (entry.content || '').split('\n').filter(Boolean).length;
+                        const pairs = countRedundantPairs(entry.content);
+                        const label = entry.comment || entry.key?.[0] || uid;
+                        flagged.push({ id: fullId, tokens, lines, pairs, label, content: entry.content });
+                    }
+                }
+            }
+
+            if (flagged.length === 0) {
+                const noFoundMsg = targetEntryId
+                    ? `Cleanup: targeted entry "${targetEntryId}" not found.`
+                    : settings.routerCleanupUseThreshold !== false
+                        ? `Cleanup: no entries exceed the token threshold (${CLEANUP_TOKEN_THRESHOLD}t). Nothing to do.`
+                        : `Cleanup: no entries found in the campaign lorebook. Nothing to do.`;
+                broadcastStep('finish', noFoundMsg);
+                _routerRunning = false;
+                return;
+            }
+
+            // Sort worst-first so the model prioritises high-impact entries
+            flagged.sort((a, b) => b.tokens - a.tokens);
+            if (targetEntryId) {
+                broadcastStep('thought', `Cleanup: compressing target entry "${flagged[0].label}"...`);
+            } else {
+                broadcastStep('thought', `Cleanup: ${flagged.length} bloated entr${flagged.length === 1 ? 'y' : 'ies'} found. Requesting compression...`);
+            }
+
+            // Build context: metadata list + full content of flagged entries
+            const cleanupContext =
+                `## ENTRIES FLAGGED FOR CONSOLIDATION\n` +
+                flagged.map(e =>
+                    `- ${e.id} | "${e.label}" | ~${e.tokens} tokens | ${e.lines} lines` +
+                    (e.pairs > 0 ? ` | ⚠ ${e.pairs} redundant line pairs` : ` | ✓ low redundancy`)
+                ).join('\n') +
+                `\n\n## ENTRY CONTENTS\n` +
+                flagged.map(e => `### ${e.id} — "${e.label}"\n${e.content}`).join('\n\n');
+
+            let basicInstructionPrompt = `You are the Lorebook Archivist. Consolidate the bloated entries shown below.
+
+## AVAILABLE TAGS
+- [[REWRITE: BookName::UID | new canonical content]]
+  Replace a single entry's content with a compressed version.
+
+- [[CONSOLIDATE: TargetID1, TargetID2 | SurvivorID | merged content]]
+  Merge two or more duplicate entries into one. All targets are deleted.
+  Targets and survivors may be in different books.
+
+## RULES
+1. Merge all timestamped updates into a single coherent, present-tense description.
+2. Preserve plot-significant changes as brief dated notes (e.g. "Burned down on Day 12").
+3. Remove redundant observations — if six updates repeat the same fact, write it once.
+4. Preserve every unique fact. When in doubt, keep it.
+5. Target 30–60% of the original token count.
+6. Do NOT activate, deactivate, record, or delete entries except via CONSOLIDATE targets.
+7. Output your reasoning first, then the tags.`;
+
+            let agentInstructionPrompt = `You are the Lorebook Archivist. Consolidate bloated lorebook entries using the tools provided.
+
+## YOUR TASK
+For each flagged entry:
+1. Call read_entry to inspect its content if needed.
+2. Decide: rewrite in place (rewrite), or merge with a duplicate (consolidate).
+3. When done, call commit once with all rewrite and consolidate operations.
+
+## RULES
+1. Merge timestamped updates into a single coherent, present-tense description.
+2. Preserve plot-significant changes as brief dated notes (e.g. "Burned down on Day 12").
+3. Remove redundant observations. Preserve every unique fact.
+4. Target 30–60% of the original token count per entry.
+5. Do NOT activate, deactivate, record, or create new entries.
+6. Call commit exactly once at the end. Do not call it per-entry.`;
+
+            if (customInstructions) {
+                const overrideText = `\n\n## USER CUSTOM REQUIREMENTS\nYou MUST adhere strictly to these custom compression instructions:\n- ${customInstructions}`;
+                basicInstructionPrompt += overrideText;
+                agentInstructionPrompt += overrideText;
+            }
+
+            // Determine routing mode here so we can shape the cleanup system prompt accordingly.
+            // Profile/default connections don't support native tool schemas; use text-format actions.
+            const usesNativeToolsForCleanup = ['openai', 'ollama'].includes(routerSettings.connectionSource);
+
+            const cleanupSystemPrompt = settings.routerBasicMode
+                ? basicInstructionPrompt
+                : (usesNativeToolsForCleanup
+                    // Native tool-call path — model receives JSON schemas via the API
+                    ? agentInstructionPrompt
+                    // Text-format path for profile/default — model must output Action: lines
+                    : agentInstructionPrompt + `
+
+## ACTIONS
+You do NOT have access to native function calling. Output exactly ONE action per turn in plain text:
+  Action: toolname({"arg": "value"})
+
+Available actions:
+- read_entry({"uid": "Book::0"}) — read the full content of an entry
+- commit({"rewrite": [...], "consolidate": [...]}) — write all cleanup changes and finish
+
+commit rewrite items: {"id": "Book::UID", "content": "compressed content"}
+commit consolidate items: {"targets": ["Book::UID1"], "survivor": "Book::UID2", "content": "merged content"}
+
+## EXAMPLE
+Thought: The entry is verbose. I will rewrite it with the key facts.
+Action: commit({"rewrite": [{"id": "Eldoria_Events::3", "content": "Compressed version of the entry."}]})`
+                );
+
+            if (settings.routerBasicMode) {
+                const cleanupUserPrompt = cleanupContext;
+                broadcastStep('thought', 'Thinking...');
+                const basicResp = await sendStateRequest(routerSettings, cleanupSystemPrompt, cleanupUserPrompt);
+                const thoughtMatchC = basicResp.match(/(?:Thought|Reasoning):\s*([\s\S]*?)(?=\[\[|$)/i);
+                if (thoughtMatchC) broadcastStep('thought', thoughtMatchC[1].trim().substring(0, 300));
+                broadcastStep('thought', 'Parsing cleanup tags...');
+                const cleanupAction = parseBasicTags(basicResp, archiveBooks);
+                cleanupAction.reason = targetEntryId ? `Targeted cleanup: ${targetEntryId}.` : 'Cleanup pass (basic mode).';
+                if (cleanupAction.rewrite.length > 0 || cleanupAction.consolidate.length > 0) {
+                    await applyAction(cleanupAction, archiveBooks, currentTime, breadcrumb);
+                    const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                    broadcastStep('finish', `Cleanup done in ${totalTime}s — ${cleanupAction.rewrite.length} rewritten, ${cleanupAction.consolidate.length} consolidated.`);
+                } else {
+                    broadcastStep('finish', 'Cleanup: agent found nothing to compress.');
+                }
+                _routerRunning = false;
+                return;
+            }
+
+            // Agent mode: lean context (metadata only) — agent uses read_entry per-entry
+            const agentCleanupContext = `## ENTRIES FLAGGED FOR CLEANUP\n` +
+                flagged.map(e =>
+                    `- ${e.id} | "${e.label}" | ~${e.tokens} tokens | ${e.lines} lines` +
+                    (e.pairs > 0 ? ` | ⚠ ${e.pairs} redundant pairs` : '')
+                ).join('\n');
+
+            const usesNativeTools = usesNativeToolsForCleanup;
+            // Text-format connections get full entry content upfront (one-shot commit, no read_entry turn needed).
+            // Native tool connections get lean metadata and can use read_entry to pull content on demand.
+            const cleanupMessages = [
+                { role: 'system', content: cleanupSystemPrompt },
+                { role: 'user',   content: usesNativeTools ? agentCleanupContext : cleanupContext }
+            ];
+
+            /** @type {Array<object>} */
+            const cleanupAgentTools = [
+                {
+                    type: 'function',
+                    function: {
+                        name: 'grep_lore',
+                        description: `Search all lorebooks in scope ("${prefix || 'All'}") for entries whose content or label contains the query.`,
+                        parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'inspect_book',
+                        description: 'List all entry labels and UIDs in a specific lorebook.',
+                        parameters: { type: 'object', properties: { book_name: { type: 'string' } }, required: ['book_name'] }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'read_entry',
+                        description: 'Read the full content of a lorebook entry.',
+                        parameters: { type: 'object', properties: { uid: { type: 'string', description: 'Entry UID in "BookName::0" format.' } }, required: ['uid'] }
+                    }
+                },
+                {
+                    type: 'function',
+                    function: {
+                        name: 'commit',
+                        description: 'Write all cleanup changes and finish. Call exactly once at the end.',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                rewrite: {
+                                    type: 'array',
+                                    description: 'Full content replacements for bloated entries.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            id:      { type: 'string', description: 'Book::UID of the entry to rewrite.' },
+                                            content: { type: 'string', description: 'New canonical content.' }
+                                        },
+                                        required: ['id', 'content']
+                                    }
+                                },
+                                consolidate: {
+                                    type: 'array',
+                                    description: 'Merge multiple entries into one. Targets are deleted.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            targets:  { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to delete after merging.' },
+                                            survivor: { type: 'string', description: 'Book::UID to keep.' },
+                                            content:  { type: 'string', description: 'Merged content for survivor.' }
+                                        },
+                                        required: ['targets', 'survivor', 'content']
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ];
+
+            let cleanupTurns = 0;
+            while (cleanupTurns < maxTurns) {
+                cleanupTurns++;
+                broadcastStep('thought', `Cleanup thinking (Turn ${cleanupTurns}/${maxTurns})...`);
+                const result = await sendAgentTurn(routerSettings, cleanupMessages, usesNativeTools ? cleanupAgentTools : null);
+
+                if (result.content) {
+                    const thoughtLine = result.content.match(/(?:Thought|Reasoning):\s*(.*)/i)?.[1]?.trim()
+                        || result.content.trim().split('\n')[0];
+                    if (thoughtLine) broadcastStep('thought', thoughtLine.substring(0, 200));
+                }
+
+                let resolvedToolCall = result.toolCall;
+                if (!resolvedToolCall && result.content) {
+                    resolvedToolCall = parseTextAction(result.content);
+                }
+                if (!resolvedToolCall) break;
+
+                const { name: toolName, args } = resolvedToolCall;
+                const callId = /** @type {any} */ (resolvedToolCall).id || `call_cleanup_${Date.now()}_${cleanupTurns}`;
+                broadcastStep('tool', `${toolName}(...)`);
+
+                cleanupMessages.push({
+                    role: 'assistant',
+                    content: result.content || null,
+                    tool_calls: [{ id: callId, type: 'function', function: { name: toolName, arguments: JSON.stringify(args) } }]
+                });
+
+                let observation = '';
+                if (toolName === 'commit') {
+                    args.reason = targetEntryId ? `Targeted cleanup: ${targetEntryId}.` : 'Cleanup pass (agent mode).';
+                    const commitResult = await applyAction(args, archiveBooks, currentTime, breadcrumb);
+                    archiveBooks = await fetchArchiveBooks();
+                    if (commitResult.errors.length > 0) {
+                        observation = `Committed with warnings: ${commitResult.errors.join(', ')}`;
+                    } else {
+                        const details = [];
+                        if (args.rewrite?.length)     details.push(`Rewritten: ${args.rewrite.length}`);
+                        if (args.consolidate?.length) details.push(`Consolidated: ${args.consolidate.length}`);
+                        observation = `Committed successfully. ${details.join(' | ')}`;
+                    }
+                } else if (toolName === 'read_entry') {
+                    const uid = args.uid || '';
+                    const [bookName, id] = uid.split('::');
+                    const book = await ctx.loadWorldInfo(bookName);
+                    observation = book?.entries?.[id] ? book.entries[id].content : `Entry "${uid}" not found.`;
+                } else if (toolName === 'grep_lore') {
+                    const query = (args.query || '').toLowerCase();
+                    const hits = [];
+                    for (const [name, book] of Object.entries(archiveBooks)) {
+                        for (const [uid, entry] of Object.entries(book.entries)) {
+                            if ((entry.content || '').toLowerCase().includes(query) || (entry.comment || '').toLowerCase().includes(query)) {
+                                hits.push(`[${name}::${uid}] "${entry.comment || uid}": ${(entry.content || '').substring(0, 120)}...`);
+                            }
+                        }
+                    }
+                    observation = hits.length > 0 ? hits.join('\n') : `No entries found for "${args.query}".`;
+                } else if (toolName === 'inspect_book') {
+                    const bookName = args.book_name || '';
+                    if (archiveBooks[bookName]) {
+                        observation = Object.entries(archiveBooks[bookName].entries)
+                            .map(([uid, e]) => `${bookName}::${uid} -- ${e.comment || e.key?.[0] || uid}`)
+                            .join('\n');
+                    } else {
+                        observation = `Book "${bookName}" not found.`;
+                    }
+                } else {
+                    observation = `Unknown tool: ${toolName}`;
+                }
+
+                broadcastStep('result', observation.substring(0, 200) + (observation.length > 200 ? '...' : ''));
+                cleanupMessages.push({
+                    role: 'tool',
+                    tool_call_id: cleanupMessages[cleanupMessages.length - 1].tool_calls[0].id,
+                    content: observation
+                });
+
+                if (toolName === 'commit') break;
+            }
+
+            const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+            broadcastStep('finish', `Cleanup done in ${totalTime}s.`);
+            _routerRunning = false;
+            return;
+        }
+        // ── End Cleanup Mode ──────────────────────────────────────────────────
+
         // -- Basic Mode (tag-based, one-shot, no tool calling) -----------------
         if (settings.routerBasicMode) {
+
             const modules = settings.routerModules || {};
             const customTags = settings.routerCustomTags || [];
             const formatLines = [];
@@ -440,7 +782,36 @@ Thought: I see a new NPC named Barnaby in Khelt's Rust-Lantern District. I will 
                                 },
                                 activate:   { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to move into active context.' },
                                 deactivate: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to remove from active context.' },
-                                delete_ids: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to permanently delete.' }
+                                delete_ids: { type: 'array', items: { type: 'string' }, description: 'Book::UID IDs to permanently delete.' },
+                                rewrite: {
+                                    type: 'array',
+                                    description: 'Replace the entire content of existing entries. Use for compressing bloated entries.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            id:      { type: 'string', description: 'Book::UID of the entry to rewrite.' },
+                                            content: { type: 'string', description: 'New canonical content. Replaces everything.' }
+                                        },
+                                        required: ['id', 'content']
+                                    }
+                                },
+                                consolidate: {
+                                    type: 'array',
+                                    description: 'Merge multiple entries into one. All targets are deleted; the survivor gets the new content.',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            targets:  {
+                                                type: 'array',
+                                                items: { type: 'string' },
+                                                description: 'One or more Book::UID IDs to delete after merging.'
+                                            },
+                                            survivor: { type: 'string', description: 'Book::UID of the entry to keep, with merged content.' },
+                                            content:  { type: 'string', description: 'Full merged canonical content for the survivor.' }
+                                        },
+                                        required: ['targets', 'survivor', 'content']
+                                    }
+                                }
                             }
                         }
                     }
@@ -620,6 +991,26 @@ ${sharedContext}`;
         const finishMsg = basicSummaryText ? `Finished in ${totalTime}s -- ${basicSummaryText}` : `Finished in ${totalTime}s`;
         broadcastStep('finish', finishMsg, { time: totalTime, turns });
 
+        // Non-blocking bloat hint and auto-cleanup check
+        {
+            const CLEANUP_TOKEN_THRESHOLD = settings.routerCleanupTokenThreshold || 300;
+            const bloatedCount = Object.values(archiveBooks)
+                .flatMap(b => Object.values(b.entries || {}))
+                .filter(e => estimateTokens(e.content) >= CLEANUP_TOKEN_THRESHOLD).length;
+
+            _routerNormalRunCount++;
+            const cleanupEvery = settings.routerCleanupEvery || 0;
+            const shouldAutoCleanup = cleanupEvery > 0 && (_routerNormalRunCount % cleanupEvery === 0) && bloatedCount > 0;
+
+            if (shouldAutoCleanup) {
+                broadcastStep('thought', `🧹 Auto-cleanup: ${bloatedCount} bloated entr${bloatedCount > 1 ? 'ies' : 'y'} found. Scheduling cleanup pass...`);
+                // Queue non-blockingly so the current pass finishes cleanly first
+                setTimeout(() => runRouterPass(null, '__CLEANUP__', null, true), 200);
+            } else if (bloatedCount > 0) {
+                broadcastStep('thought', `💡 ${bloatedCount} entr${bloatedCount > 1 ? 'ies' : 'y'} may benefit from cleanup (>${CLEANUP_TOKEN_THRESHOLD} tokens). Use the 🧹 button to compress.`);
+            }
+        }
+
         return true;
     } catch (e) {
         console.error("[Lorebook Agent] Run failed:", e);
@@ -705,6 +1096,58 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             changed = true;
         }
     }
+
+    // 2b. Rewrite (full content replacement — no append, no dedup)
+    const rewriteIds = [];
+    for (const rw of (action.rewrite || [])) {
+        const [bookName, uid] = rw.id.split('::');
+        const book = await ctx.loadWorldInfo(bookName);
+        if (book?.entries?.[uid]) {
+            book.entries[uid].content = rw.content;
+            await ctx.saveWorldInfo(bookName, book);
+            rewriteIds.push(rw.id);
+            changed = true;
+        } else {
+            errors.push(`Rewrite target not found: ${rw.id}`);
+        }
+    }
+
+    // 2c. Consolidate (many-to-one merge with deletion)
+    const consolidateIds = [];
+    for (const op of (action.consolidate || [])) {
+        // Update the survivor with merged content
+        const [sBook, sUid] = op.survivor.split('::');
+        const sBookData = await ctx.loadWorldInfo(sBook);
+        if (sBookData?.entries?.[sUid]) {
+            sBookData.entries[sUid].content = op.content;
+            await ctx.saveWorldInfo(sBook, sBookData);
+            consolidateIds.push(op.survivor);
+        } else {
+            errors.push(`Consolidate survivor not found: ${op.survivor}`);
+            continue;
+        }
+
+        // Delete each target and scrub from active/keyword key lists
+        for (const targetId of (op.targets || [])) {
+            const [tBook, tUid] = targetId.split('::');
+            const tBookData = await ctx.loadWorldInfo(tBook);
+            if (tBookData?.entries?.[tUid]) {
+                delete tBookData.entries[tUid];
+                await ctx.saveWorldInfo(tBook, tBookData);
+            } else {
+                errors.push(`Consolidate target not found: ${targetId}`);
+            }
+            settings.activeRouterKeys = (settings.activeRouterKeys || [])
+                .filter(k => k !== targetId);
+            newActive = newActive.filter(k => k !== targetId);
+            if (Array.isArray(settings.keywordActivatedKeys)) {
+                settings.keywordActivatedKeys = settings.keywordActivatedKeys
+                    .filter(k => k !== targetId);
+            }
+        }
+        changed = true;
+    }
+
     // 3. Record new (with Deduplication)
     // Group entries by target book and commit once per book to avoid UID collisions
     const records = action.record || [];
@@ -888,6 +1331,8 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
             deactivate: deactivate,
             record: recordedIds,
             delete: deleteIds,
+            rewrite: rewriteIds,
+            consolidate: consolidateIds,
             reason: action.reason || (settings.routerBasicMode ? "Tag-based update." : "Agent tool update.")
         });
         if (settings.routerLog.length > 50) settings.routerLog.length = 50;
@@ -1062,8 +1507,27 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
  * Parses basic narrative tags [[TAG: ...]]
  */
 function parseBasicTags(text, archiveBooks) {
-    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [] };
+    const action = { record: [], update: [], activate: [], deactivate: [], delete_ids: [], rewrite: [], consolidate: [] };
     const settings = getSettings();
+
+    // REWRITE tag parser
+    const rewriteRegex = /\[\[REWRITE:\s*([^|]+)\|([\s\S]*?)\]\]/gi;
+    let rw;
+    while ((rw = rewriteRegex.exec(text)) !== null) {
+        const id      = rw[1].trim();
+        const content = rw[2].trim();
+        action.rewrite.push({ id, content });
+    }
+
+    // CONSOLIDATE tag parser
+    const consolidateRegex = /\[\[CONSOLIDATE:\s*([^|]+)\|([^|]+)\|([\s\S]*?)\]\]/gi;
+    let cm;
+    while ((cm = consolidateRegex.exec(text)) !== null) {
+        const targets  = cm[1].split(',').map(s => s.trim()).filter(Boolean);
+        const survivor = cm[2].trim();
+        const content  = cm[3].trim();
+        action.consolidate.push({ targets, survivor, content });
+    }
 
     const processMatch = (name, content, keywords, category) => {
         name = name.trim().replace(/^[A-Z_]{2,10}:\s+/i, '').trim();
@@ -1095,6 +1559,8 @@ function parseBasicTags(text, archiveBooks) {
 
     while ((match = tagRegex.exec(text)) !== null) {
         const tagName = match[1].toUpperCase();
+        if (tagName === 'REWRITE' || tagName === 'CONSOLIDATE') continue; // Collision protection
+
         const inner = match[2];
         const parts = inner.split('|').map(p => p.trim());
 
@@ -1589,3 +2055,58 @@ function deduplicateContent(existing, delta) {
     });
     return newLines.join('\n').trim();
 }
+
+/**
+ * Estimates token count using a ~4 chars/token heuristic.
+ * Sufficient for threshold comparisons; no tokenizer dependency needed.
+ */
+function estimateTokens(str) {
+    return Math.ceil((str || '').length / 4);
+}
+
+/**
+ * Returns the set of word bigrams from a string,
+ * stripping timestamp markers like [Day X, HH:MM].
+ */
+function getBigrams(str) {
+    const words = str.toLowerCase()
+        .replace(/\[[^\]]+\]/g, '')
+        .trim()
+        .split(/\s+/);
+    const bigrams = new Set();
+    for (let i = 0; i < words.length - 1; i++) {
+        bigrams.add(`${words[i]} ${words[i + 1]}`);
+    }
+    return bigrams;
+}
+
+/**
+ * Jaccard similarity between two strings based on word bigrams.
+ * Returns 0–1; higher = more similar.
+ */
+function jaccardSimilarity(a, b) {
+    const ba = getBigrams(a), bb = getBigrams(b);
+    const intersection = [...ba].filter(x => bb.has(x)).length;
+    const union = new Set([...ba, ...bb]).size;
+    return union === 0 ? 0 : intersection / union;
+}
+
+/**
+ * Counts near-duplicate line pairs within a single entry's content.
+ * Used to annotate entries in the cleanup context — not passed verbatim to the LLM.
+ *
+ * @param {string} content
+ * @param {number} threshold - Similarity threshold (default 0.6)
+ * @returns {number} Count of near-duplicate pairs
+ */
+function countRedundantPairs(content, threshold = 0.6) {
+    const lines = content.split('\n').filter(Boolean);
+    let count = 0;
+    for (let i = 0; i < lines.length; i++) {
+        for (let j = i + 1; j < lines.length; j++) {
+            if (jaccardSimilarity(lines[i], lines[j]) >= threshold) count++;
+        }
+    }
+    return count;
+}
+

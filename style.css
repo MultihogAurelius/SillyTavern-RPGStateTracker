@@ -2205,3 +2205,18 @@
 }
 
 
+/* ─── Remove Up/Down Spinners Globally for extension number inputs ─── */
+.rpg-tracker-panel input[type="number"]::-webkit-outer-spin-button,
+.rpg-tracker-panel input[type="number"]::-webkit-inner-spin-button,
+.rpg-tracker-settings input[type="number"]::-webkit-outer-spin-button,
+.rpg-tracker-settings input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.rpg-tracker-panel input[type="number"],
+.rpg-tracker-settings input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+
+

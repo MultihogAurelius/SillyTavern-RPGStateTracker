@@ -179,8 +179,11 @@ You may be asked to use Markers: ((PLS)), ((B)), ((XB)), ((BDG)), ((HGT)). These
         routerIncludeHidden: false,
         routerPromptForPrefix: false,
         routerModules: JSON.parse(JSON.stringify(DEFAULT_MODULES)),
-        routerCustomTags: [], 
+        routerCustomTags: [],
         routerHistory: [],
+        routerCleanupTokenThreshold: 300,
+        routerCleanupEvery: 0,
+        routerCleanupUseThreshold: true,
         routerSystemPromptTemplate: `<basic_instructions>
 You are the Researcher Agent, a specialized Dungeon Master's Assistant. Your role is to architect the AI Narrator's memory — keeping the Active Context saturated with the most relevant lore at all times.
 

@@ -2704,6 +2704,26 @@ Rules:
                     <div class="rpg-tracker-header-center" id="rt-agent-pause-banner" style="color:#ffa500; font-size:0.7em; font-weight:bold; letter-spacing:0.04em;">${settings.routerPaused ? 'AGENT PAUSED' : ''}</div>
                     <div class="rpg-tracker-header-right">
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-manual-run" title="Run Research Now" style="color: var(--rt-accent);"><i class="fa-solid fa-play"></i></button>
+                         <div id="rt-cleanup-menu-wrap" style="position:relative; display:inline-flex;">
+                             <button class="rpg-tracker-icon-btn" id="rt-agent-router-cleanup" title="Cleanup Menu" style="color: #e67e22;"><i class="fa-solid fa-broom"></i></button>
+                             <div id="rt-cleanup-dropdown" style="display:none; position:absolute; top:100%; right:0; z-index:9999; background:var(--rt-card-bg,#1a1a2e); border:1px solid rgba(230,126,34,0.35); border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.5); min-width:200px; padding:4px 0; margin-top:2px;">
+                                 <button id="rt-cleanup-run-btn" style="display:block; width:100%; text-align:left; padding:7px 14px; background:none; border:none; color:var(--rt-text,#e0e0e0); font-size:12px; cursor:pointer; white-space:nowrap;">🧹 Run Cleanup</button>
+                                 <div style="height:1px; background:rgba(255,255,255,0.06); margin:2px 0;"></div>
+                                 <button id="rt-cleanup-settings-toggle" style="display:block; width:100%; text-align:left; padding:7px 14px; background:none; border:none; color:var(--rt-text,#e0e0e0); font-size:12px; cursor:pointer; white-space:nowrap;">⚙ Cleanup Settings</button>
+                                 <div id="rt-cleanup-settings-panel" style="display:none; padding:8px 12px; border-top:1px solid rgba(255,255,255,0.07); margin-top:2px;">
+                                     <label style="display:flex; align-items:center; gap:6px; font-size:10px; opacity:0.75; margin-bottom:8px; cursor:pointer; user-select:none;">
+                                         <input id="rt-cleanup-use-threshold-chk" type="checkbox" ${settings.routerCleanupUseThreshold !== false ? 'checked' : ''} style="margin:0; cursor:pointer; accent-color:#e67e22;">
+                                         Use Token Threshold
+                                     </label>
+                                     <div id="rt-cleanup-threshold-row" style="transition:opacity 0.15s; opacity:${settings.routerCleanupUseThreshold !== false ? '1' : '0.35'}; pointer-events:${settings.routerCleanupUseThreshold !== false ? 'auto' : 'none'};">
+                                         <label style="font-size:10px; opacity:0.6; display:block; margin-bottom:2px;">Token Threshold</label>
+                                         <input id="rt-cleanup-threshold-inp" type="text" inputmode="numeric" pattern="[0-9]*" min="50" max="5000" step="50" value="${settings.routerCleanupTokenThreshold || 300}" style="width:100%; background:rgba(0,0,0,0.35); color:var(--rt-text,#e0e0e0); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:11px; box-sizing:border-box; margin-bottom:8px;">
+                                     </div>
+                                     <label style="font-size:10px; opacity:0.6; display:block; margin-bottom:2px;">Auto-Cleanup Every N Turns <span style="opacity:0.45;">(0 = off)</span></label>
+                                     <input id="rt-cleanup-every-inp" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="100" step="1" value="${settings.routerCleanupEvery || 0}" style="width:100%; background:rgba(0,0,0,0.35); color:var(--rt-text,#e0e0e0); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:11px; box-sizing:border-box;">
+                                 </div>
+                             </div>
+                         </div>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-enable-btn" title="${settings.routerEnabled ? 'Disable Lorebook Agent' : 'Enable Lorebook Agent'}" style="${settings.routerEnabled ? '' : 'opacity:0.35;'}">⏻</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-pause-btn" title="${settings.routerPaused ? 'Resume Agent (auto-runs paused)' : 'Pause Agent (skip auto-runs)'}" style="${settings.routerPaused ? 'color:#ffa500;' : ''}">${settings.routerPaused ? '▶' : '⏸'}</button>
                         <button class="rpg-tracker-icon-btn" id="rt-agent-router-detach" title="Detach Lorebook Agent">⧉</button>
@@ -2730,12 +2750,12 @@ Rules:
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Main lookback: last N chat messages (user and assistant, in order) included in the agent context during automatic passes.">
                             <span style="font-size: 0.769em; opacity: 0.7;">Lookback (user/assistant):</span>
-                            <input type="number" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-lookback" value="${settings.routerLookback || 4}" min="1" max="100" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
                             <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex: 1;" title="Run every N messages: The agent only fires an auto-pass once per N AI responses. Higher = fewer runs, fewer tokens. Manual runs always fire immediately.">
                             <span style="font-size: 0.769em; opacity: 0.7;">Run every:</span>
-                            <input type="number" id="rt-agent-router-run-every" value="${settings.routerRunEvery || 1}" min="1" max="50" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-run-every" value="${settings.routerRunEvery || 1}" min="1" max="50" style="width: 40px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px;">
                             <span style="font-size: 0.769em; opacity: 0.5;">msgs</span>
                         </div>
                     </div>
@@ -2748,11 +2768,11 @@ Rules:
 
                         <div style="flex: 1;" title="Max Turns: How many Thought/Action loops the agent can perform before timing out (Advanced Mode only).">
                             <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Agent Turns:</div>
-                            <input type="number" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-turns" value="${settings.routerMaxTurns || 5}" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                         <div style="flex: 1;" title="Max Active Keys: The maximum number of lore entries the agent can keep in Active Memory. Once reached, it must deactivate old entries to add new ones.">
                             <div style="margin-bottom: 5px; opacity: 0.8; font-size: 0.846em; color: var(--rt-text-muted);">Max Active Keys:</div>
-                            <input type="number" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 8}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-max-activations" value="${settings.routerMaxActivations || 8}" min="1" max="20" style="width: 100%; background: var(--rt-card-bg); color: var(--rt-text); border: var(--rt-border); border-radius: 4px; padding: 4px; font-size: 0.846em; box-sizing: border-box;">
                         </div>
                     </div>
                     
@@ -2762,7 +2782,7 @@ Rules:
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: var(--rt-header-bg); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; min-height: 32px;">
                         <div style="display: flex; align-items: center; gap: 6px;" title="Direct lookback: last N chat messages (user and assistant) for this manual run.">
                             <span style="font-size: 0.769em; opacity: 0.7; color: var(--rt-text-muted);">Lookback (user/assistant):</span>
-                            <input type="number" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-agent-router-direct-lookback" value="${settings.routerDirectLookback || 10}" min="1" max="100" style="width: 38px; background: var(--rt-card-bg); border: 1px solid var(--rt-accent-dim); color: var(--rt-accent); border-radius: 3px; text-align: center; font-size: 0.769em; padding: 1px; box-sizing: border-box; height: 20px;">
                             <span style="font-size: 0.769em; opacity: 0.5; color: var(--rt-text-muted);">msgs</span>
                         </div>
                         <button id="rt-agent-router-run-direct" class="rpg-tracker-prompt-send" style="width: auto; height: 22px; padding: 0 10px; font-size: 0.769em; font-weight: bold; gap: 4px; margin: 0;" title="Execute Lorebook Agent pass">
@@ -2834,7 +2854,10 @@ Rules:
                     <hr style="border-color: #333; margin: 10px 0;">
 
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
-                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em;">Active Lore Keys:</div>
+                        <div style="font-weight: bold; opacity: 0.8; font-size: 0.846em; display: flex; align-items: center; gap: 4px;">
+                            Active Lore Keys:
+                            <span id="rt-agent-active-tokens" style="font-weight: normal; opacity: 0.55; color: var(--rt-text-muted); font-size: 0.95em;">(0t)</span>
+                        </div>
                         <button id="rt-agent-keys-refresh" title="Refresh active keys from disk" style="background: none; border: none; color: var(--rt-accent); font-size: 0.769em; cursor: pointer; opacity: 0.6; padding: 0;" ><i class="fa-solid fa-arrows-rotate"></i></button>
                     </div>
                     <div id="rt-agent-router-active-keys" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px;">
@@ -2882,7 +2905,7 @@ Rules:
                 <textarea class="rpg-tracker-prompt-input" id="rpg-tracker-prompt-input" rows="2" placeholder="Instruct the tracker model… (Enter to send, Shift+Enter for newline)"></textarea>
                 <div style="display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: flex-end;">
                     <div class="rt-prompt-ctx-control" style="font-size: 0.692em; display: flex; flex-direction: column; align-items: center; gap: 0;" title="Context: number of recent messages to include">
-                        <input type="number" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50" style="width: 28px; height: 16px; font-size: 0.692em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt-prompt-context-val" value="${settings.directPromptContext || 5}" min="0" max="50" style="width: 28px; height: 16px; font-size: 0.692em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 3px; text-align: center; padding: 0;">
                         <span style="opacity: 0.5; font-size: 8px; line-height: 1;">msg</span>
                     </div>
                     <button class="rpg-tracker-prompt-send" id="rpg-tracker-prompt-send" title="Send instruction">▶</button>
@@ -3078,6 +3101,20 @@ Rules:
                 books[bookName] = await ctx.loadWorldInfo(bookName);
             }
 
+            // Calculate total active tokens
+            let activeTokens = 0;
+            for (const k of activeKeys) {
+                const [bookName, uid] = k.split('::');
+                const entry = books[bookName]?.entries?.[uid];
+                if (entry) {
+                    activeTokens += Math.round((entry.content || '').length / 4);
+                }
+            }
+            const activeTokensEl = agentPanel.querySelector('#rt-agent-active-tokens');
+            if (activeTokensEl) {
+                activeTokensEl.textContent = `(${activeTokens}t)`;
+            }
+
             // Use keywordActivatedKeys (persistent pool) for yellow pill coloring.
             // lastKeywordTriggeredKeys only covers the most recent scan pass and resets immediately.
             const keywordTriggeredSet = new Set(s.keywordActivatedKeys || []);
@@ -3112,6 +3149,8 @@ Rules:
                 if (entry.deactivate?.length) diffStr += `<span style="color:#ff5555;">-${entry.deactivate.length}</span> `;
                 if (entry.record?.length) diffStr += `<span style="color:#55ccff;" title="Created: ${entry.record.join(', ')}">*${entry.record.length}</span> `;
                 if (entry.delete?.length) diffStr += `<span style="color:#ff3333; font-weight: bold;" title="Deleted: ${entry.delete.join(', ')}">✕${entry.delete.length}</span> `;
+                if (entry.rewrite?.length) diffStr += `<span style="color:#e67e22; font-weight: bold;" title="Rewritten: ${entry.rewrite.join(', ')}">✎${entry.rewrite.length}</span> `;
+                if (entry.consolidate?.length) diffStr += `<span style="color:#9b59b6; font-weight: bold;" title="Consolidated: ${entry.consolidate.join(', ')}">⎘${entry.consolidate.length}</span> `;
                 return `<div style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 4px; font-size: 0.769em; margin-bottom: 4px; border-left: 2px solid rgba(255,255,255,0.05);">
                     <div style="display:flex; justify-content: space-between; opacity: 0.7; margin-bottom: 2px; font-weight: bold;">
                         <span>${entry.time}</span>
@@ -3348,11 +3387,17 @@ Rules:
 
                 const readActions = document.createElement('div');
                 readActions.style.cssText = 'display:flex; justify-content:flex-end; margin-top:2px;';
+                const cleanBtn = document.createElement('button');
+                cleanBtn.type = 'button';
+                cleanBtn.textContent = 'Clean';
+                cleanBtn.title = 'Run targeted cleanup for this entry';
+                cleanBtn.style.cssText = 'background:rgba(230,126,34,0.12); border:1px solid rgba(230,126,34,0.35); color:#e67e22; border-radius:3px; font-size:9px; padding:2px 10px; cursor:pointer; margin-right:5px;';
                 const editBtn = document.createElement('button');
                 editBtn.type = 'button';
                 editBtn.textContent = 'Edit';
                 editBtn.title = 'Edit this lore entry';
                 editBtn.style.cssText = 'background:rgba(80,140,255,0.12); border:1px solid rgba(80,140,255,0.35); color:var(--rt-accent); border-radius:3px; font-size:9px; padding:2px 10px; cursor:pointer;';
+                readActions.appendChild(cleanBtn);
                 readActions.appendChild(editBtn);
 
                 readPane.appendChild(titleRead);
@@ -3448,6 +3493,45 @@ Rules:
                     readPane.style.display = 'none';
                     editPane.style.display = 'flex';
                 }
+
+                cleanBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (isRouterRunning()) {
+                        // @ts-ignore
+                        toastr.warning('Agent is already running.', 'Lorebook Agent');
+                        return;
+                    }
+
+                    const { Popup } = SillyTavern.getContext();
+                    const promptHtml = `
+                        <div style="text-align: left; font-size: 0.9em; line-height: 1.4;">
+                            <p>You are triggering a targeted cleanup pass for <b>${escapeHtml(item.label)}</b>.</p>
+                            <p style="margin-top: 8px;">Enter custom requirements for this entry's compression (e.g., <i>"Keep the personality section intact"</i> or <i>"Shorten to 3 concise bullet points"</i>):</p>
+                            <textarea id="rt-entry-clean-instructions" style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; padding: 5px; font-size: 12px; box-sizing: border-box; resize: none; margin-top: 5px;" placeholder="Leave blank for standard compression..."></textarea>
+                        </div>
+                    `;
+
+                    const choice = await Popup.show.confirm('🧹 Targeted Entry Cleanup', promptHtml, {
+                        okButton: 'Clean Entry',
+                        cancelButton: 'Cancel'
+                    });
+
+                    if (choice) {
+                        const textarea = document.getElementById('rt-entry-clean-instructions');
+                        const customInstructions = textarea ? textarea.value.trim() : '';
+
+                        const parts = item.id.split('::');
+                        if (parts.length >= 2) {
+                            const b = parts[0];
+                            const u = parts[1];
+                            let manualPrompt = `__CLEANUP__::${b}::${u}`;
+                            if (customInstructions) {
+                                manualPrompt += `::${customInstructions}`;
+                            }
+                            runRouterPass(null, manualPrompt, null, true);
+                        }
+                    }
+                });
 
                 editBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -3545,6 +3629,7 @@ Rules:
                             : bookName;
 
                         const activeCount = items.filter(i => i.is_active).length;
+                        const totalTokens = items.reduce((sum, item) => sum + Math.round((item.content || '').length / 4), 0);
                         const isOpen = _manifestOpenFolders.has(bookName);
 
                         const folder = document.createElement('div');
@@ -3555,7 +3640,7 @@ Rules:
                         folderHdr.innerHTML = `
                             <span class="rt-mf-icon" style="font-size:9px; opacity:0.5; width:10px; flex-shrink:0; font-family:monospace;">${isOpen ? '▼' : '▶'}</span>
                             <span style="font-weight:bold; font-size:11px; flex:1; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayName)}</span>
-                            <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length}</span>
+                            <span style="font-size:9px; opacity:0.45; color:var(--rt-text-muted); flex-shrink:0;">${activeCount}/${items.length} (${totalTokens}t)</span>
                         `;
 
                         const folderBody = document.createElement('div');
@@ -3579,9 +3664,11 @@ Rules:
                             entryHdr.style.cssText = 'display:flex; align-items:center; gap:5px; padding:3px 4px; cursor:pointer; border-radius:3px;';
 
                             const isDirty = _dirtyEntries.has(item.id);
+                            const entryTokens = Math.round((item.content || '').length / 4);
                             entryHdr.innerHTML = `
                                 <div style="width:5px; height:5px; border-radius:50%; background:${statusColor}; flex-shrink:0;" title="${item.is_active ? 'Active (visible to agent)' : 'Inactive'}"></div>
                                 <span style="flex:1; font-size:10px; color:var(--rt-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.label)}${isDirty ? ' <span style="color:#ffa500; font-size:8px;" title="Unsaved edits">●</span>' : ''}</span>
+                                <span style="font-size:8px; opacity:0.5; color:var(--rt-text-muted); margin-right:5px; flex-shrink:0; background:rgba(255,255,255,0.06); padding:1px 4px; border-radius:4px;" title="Estimated tokens">${entryTokens}t</span>
                                 <button class="rt-agent-entry-delete" data-id="${item.id}" style="background:none; border:none; color:var(--rt-text-muted); cursor:pointer; font-size:9px; padding:1px 3px; opacity:0; flex-shrink:0;" title="Delete entry"><i class="fa-solid fa-trash"></i></button>
                             `;
 
@@ -4052,6 +4139,122 @@ Rules:
                     toastr['info']("Starting manual research pass...");
                     await runRouterPass(combinedNarrative, null, s.routerLookback || 4, true);
                 });
+            }
+
+            // ── Cleanup dropdown submenu ─────────────────────────────────────────────
+            const cleanupBroomBtn   = agentPanel.querySelector('#rt-agent-router-cleanup');
+            const cleanupDropdown   = agentPanel.querySelector('#rt-cleanup-dropdown');
+            const cleanupRunBtn     = agentPanel.querySelector('#rt-cleanup-run-btn');
+            const cleanupSettingsToggle   = agentPanel.querySelector('#rt-cleanup-settings-toggle');
+            const cleanupSettingsPanel    = agentPanel.querySelector('#rt-cleanup-settings-panel');
+            const cleanupThresholdInp     = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-cleanup-threshold-inp'));
+            const cleanupEveryInp         = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-cleanup-every-inp'));
+            const cleanupUseThresholdChk  = /** @type {HTMLInputElement|null} */ (agentPanel.querySelector('#rt-cleanup-use-threshold-chk'));
+            const cleanupThresholdRow     = /** @type {HTMLElement|null} */ (agentPanel.querySelector('#rt-cleanup-threshold-row'));
+
+            if (cleanupBroomBtn && cleanupDropdown) {
+                // Toggle dropdown on broom click
+                cleanupBroomBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isOpen = cleanupDropdown.style.display !== 'none';
+                    cleanupDropdown.style.display = isOpen ? 'none' : 'block';
+                });
+
+                // Stop pointer/mouse/click propagation inside the dropdown (prevents header drag and outside-dismiss),
+                // but pass through events on form controls so native spinner/focus behaviour is preserved.
+                const _isFormControl = (/** @type {EventTarget|null} */ t) =>
+                    t instanceof Element && t.closest('input, select, textarea') !== null;
+                cleanupDropdown.addEventListener('pointerdown', (e) => { if (!_isFormControl(e.target)) e.stopPropagation(); });
+                cleanupDropdown.addEventListener('mousedown',   (e) => { if (!_isFormControl(e.target)) e.stopPropagation(); });
+                cleanupDropdown.addEventListener('click',       (e) => e.stopPropagation());
+
+                // Dismiss dropdown on outside click
+                document.addEventListener('click', (e) => {
+                    if (!cleanupDropdown.parentElement?.contains(/** @type {Node} */ (e.target))) {
+                        cleanupDropdown.style.display = 'none';
+                    }
+                });
+
+                // "Run Cleanup" button — existing popup-then-run flow
+                if (cleanupRunBtn) {
+                    cleanupRunBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        cleanupDropdown.style.display = 'none';
+
+                        if (isRouterRunning()) {
+                            // @ts-ignore
+                            toastr.warning('Agent is already running.', 'Lorebook Agent');
+                            return;
+                        }
+
+                        const { Popup } = SillyTavern.getContext();
+                        const s = getSettings();
+                        const threshold = s.routerCleanupTokenThreshold || 300;
+                        const promptHtml = `
+                            <div style="text-align: left; font-size: 0.9em; line-height: 1.4;">
+                                <p>You are triggering a <b>Global Cleanup Mode</b> pass to consolidate all bloated lore entries (&gt;${threshold} tokens).</p>
+                                <p style="margin-top: 8px;">Enter custom requirements for the global compression (e.g., <i>"Keep background lore detailed but condense quest status"</i>):</p>
+                                <textarea id="rt-global-clean-instructions" style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px; padding: 5px; font-size: 12px; box-sizing: border-box; resize: none; margin-top: 5px;" placeholder="Leave blank for standard cleanup..."></textarea>
+                            </div>
+                        `;
+
+                        const choice = await Popup.show.confirm('🧹 Global Lorebook Cleanup', promptHtml, {
+                            okButton: 'Clean All Bloated',
+                            cancelButton: 'Cancel'
+                        });
+
+                        if (choice) {
+                            const textarea = document.getElementById('rt-global-clean-instructions');
+                            const customInstructions = textarea ? textarea.value.trim() : '';
+                            let manualPrompt = '__CLEANUP__';
+                            if (customInstructions) manualPrompt += `::::${customInstructions}`;
+                            toastr['info']('Starting lorebook cleanup mode...', 'Lorebook Agent');
+                            await runRouterPass(null, manualPrompt, null, true);
+                        }
+                    });
+                }
+
+                // "⚙ Settings" toggle
+                if (cleanupSettingsToggle && cleanupSettingsPanel) {
+                    cleanupSettingsToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isOpen = cleanupSettingsPanel.style.display !== 'none';
+                        cleanupSettingsPanel.style.display = isOpen ? 'none' : 'block';
+                    });
+                }
+
+                // Threshold input → persists immediately
+                if (cleanupThresholdInp) {
+                    cleanupThresholdInp.addEventListener('change', (e) => {
+                        const s = getSettings();
+                        const v = parseInt(/** @type {HTMLInputElement} */ (e.target).value) || 300;
+                        s.routerCleanupTokenThreshold = Math.max(50, Math.min(5000, v));
+                        /** @type {HTMLInputElement} */ (e.target).value = String(s.routerCleanupTokenThreshold);
+                        SillyTavern.getContext().saveSettingsDebounced();
+                    });
+                }
+
+                // Interval input → persists immediately
+                if (cleanupEveryInp) {
+                    cleanupEveryInp.addEventListener('change', (e) => {
+                        const s = getSettings();
+                        const v = parseInt(/** @type {HTMLInputElement} */ (e.target).value);
+                        s.routerCleanupEvery = isNaN(v) ? 0 : Math.max(0, Math.min(100, v));
+                        /** @type {HTMLInputElement} */ (e.target).value = String(s.routerCleanupEvery);
+                        SillyTavern.getContext().saveSettingsDebounced();
+                    });
+                }
+
+                // Use-threshold checkbox → dims threshold row and persists
+                if (cleanupUseThresholdChk && cleanupThresholdRow) {
+                    cleanupUseThresholdChk.addEventListener('change', () => {
+                        const s = getSettings();
+                        s.routerCleanupUseThreshold = cleanupUseThresholdChk.checked;
+                        cleanupThresholdRow.style.opacity  = cleanupUseThresholdChk.checked ? '1' : '0.35';
+                        cleanupThresholdRow.style.pointerEvents = cleanupUseThresholdChk.checked ? 'auto' : 'none';
+                        SillyTavern.getContext().saveSettingsDebounced();
+                    });
+                }
             }
 
         // ── Lorebook Agent Detaching ──
@@ -4812,7 +5015,7 @@ Rules:
         const onPointerDown = (e) => {
             if (e.button !== 0) return;
             // Ignore clicks on buttons inside the header
-            if (e.target instanceof Element && e.target.closest('button')) return;
+            if (e.target instanceof Element && e.target.closest('button, input, select, textarea')) return;
             isDragging = true;
             handle.setPointerCapture(e.pointerId);
             const rect = panel.getBoundingClientRect();
@@ -5070,7 +5273,7 @@ Rules:
                     <div style="display:flex; align-items:center; gap:10px; margin-top:4px; padding:2px 4px;">
                         <div style="display:flex; align-items:center; gap:6px;">
                             <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
-                            <input type="number" id="rt_cfe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt_cfe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
                             <span style="font-size:11px; opacity:0.6;">entries</span>
                         </div>
                     </div>
@@ -5281,7 +5484,7 @@ Rules:
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; padding:0 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <span style="font-size:12px; font-weight:bold; opacity:0.8;">Pagination Threshold:</span>
-                                <input type="number" id="rt_pe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
+                                <input type="text" inputmode="numeric" pattern="[0-9]*" id="rt_pe_pagesize" class="text_pole" style="width:50px; height:24px; text-align:center;" min="1" max="99" title="How many items to show before adding page buttons">
                                 <span style="font-size:11px; opacity:0.6;">entries</span>
                             </div>
                         </div>

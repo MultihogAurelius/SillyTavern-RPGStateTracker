@@ -374,18 +374,20 @@ export async function sendStateRequest(settings, systemPrompt, userPrompt, signa
 
             if (typeof raw === 'string') return raw;
             const r = /** @type {any} */ (raw);
-            const text = r?.content
+            let text = r?.content
                 ?? r?.message?.content
                 ?? r?.choices?.[0]?.message?.content
                 ?? r?.choices?.[0]?.text
-                // Some providers (e.g. models with extended thinking) return empty content
-                // with the actual response in a reasoning/thinking field — treat it as the output.
-                ?? r?.reasoning
-                ?? r?.message?.reasoning
-                ?? r?.choices?.[0]?.message?.reasoning
                 ?? null;
 
-            if (text) {
+            if (text === null || text === undefined || text === '') {
+                text = r?.reasoning
+                    ?? r?.message?.reasoning
+                    ?? r?.choices?.[0]?.message?.reasoning
+                    ?? text;
+            }
+
+            if (typeof text === 'string') {
                 logTransaction('Tracker', [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], text);
                 return text;
             }
@@ -640,8 +642,20 @@ export async function sendAgentTurn(settings, messages, tools = null, signal = n
                 try { args = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : (tc.function?.arguments ?? {}); } catch (_) { args = {}; }
                 return { content: r?.choices?.[0]?.message?.content || '', toolCall: { name: tc.function.name, args, id: tc.id || `call_${Date.now()}` } };
             }
-            const text = r?.content ?? r?.message?.content ?? r?.choices?.[0]?.message?.content ?? r?.choices?.[0]?.text ?? r?.reasoning ?? r?.message?.reasoning ?? r?.choices?.[0]?.message?.reasoning ?? null;
-            if (text) return { content: text, toolCall: null };
+            let text = r?.content
+                ?? r?.message?.content
+                ?? r?.choices?.[0]?.message?.content
+                ?? r?.choices?.[0]?.text
+                ?? null;
+
+            if (text === null || text === undefined || text === '') {
+                text = r?.reasoning
+                    ?? r?.message?.reasoning
+                    ?? r?.choices?.[0]?.message?.reasoning
+                    ?? text;
+            }
+
+            if (typeof text === 'string') return { content: text, toolCall: null };
             throw new Error(`[RPG Tracker] Profile agent turn returned unexpected type: ${JSON.stringify(raw).substring(0, 200)}`);
         }
     }
