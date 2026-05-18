@@ -20,9 +20,6 @@ I wasn't satisfied with any of the commercial offerings available (AI Realm, AI 
 
 Together they solve the three core problems of LLM tabletop RP: the AI forgeting your inventory/spells, the AI forgetting long-term context, and you always winning (aka. plot armor).  I have high confidence in the system's reliability—you can just play and not worry about tinkering with much of anything.
 
-<img width="1014" height="1896" alt="image" src="https://github.com/user-attachments/assets/8505e94c-3b48-4e5c-b938-a25dde31c03b" />
-
-
 ---
 
 ⚠️ **Updating?** To stay up to date after updating the extension, especially after updating to 2.0.0+, click on the "Update Main Sysprompt" button in the extension settings.
@@ -97,12 +94,6 @@ For the state pass, I use Gemini 3 Flash with low reasoning.
   </figure>
 </div>
 
-<div align="center">
-  <figure>
-    <img width="366" height="75" alt="image" src="https://github.com/user-attachments/assets/42b7370b-071a-43d3-a0c7-a5df2e2d0ea9" />
-    <figcaption>Lorebook Agent</figcaption>
-  </figure>
-</div>
 
 ## License
 MIT
