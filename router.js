@@ -184,6 +184,10 @@ export async function runRouterPass(narrativeOutput, manualPrompt = null, custom
         {
             const snapshot = {
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                /** SillyTavern chat id when this snapshot was taken — rollback must refuse if the user switched chats. */
+                chatId: ctx.chatId || '',
+                /** Campaign prefix at snapshot time — catches prefix-override changes. */
+                campaignPrefix: prefix,
                 activeRouterKeys: JSON.parse(JSON.stringify(settings.activeRouterKeys || [])),
                 bookSnapshots: {}
             };
@@ -1359,6 +1363,28 @@ async function applyAction(action, allBooks = {}, currentTime = '', breadcrumb =
 }
 
 /**
+ * @param {{ bookSnapshots?: Record<string, any>, chatId?: string, campaignPrefix?: string }} snapshot
+ * @param {string} prefix - {@link getLivePrefix}
+ * @param {string} liveChatId - {@link SillyTavern.getContext().chatId}
+ * @returns {string|null} Abort reason for console / UI, or null if safe to apply lore mutations.
+ */
+function getLoreSnapshotApplyAbortReason(snapshot, prefix, liveChatId) {
+    const names = Object.keys(snapshot?.bookSnapshots || {});
+    if (names.length > 0 && prefix) {
+        if (!names.every(n => bookBelongsToPrefix(n, prefix))) {
+            return 'snapshot lorebooks do not belong to the current campaign prefix (likely a different chat)';
+        }
+    }
+    if (snapshot.chatId && liveChatId && snapshot.chatId !== liveChatId) {
+        return 'snapshot was taken on a different chat';
+    }
+    if (snapshot.campaignPrefix && prefix && snapshot.campaignPrefix !== prefix) {
+        return 'campaign prefix changed since this snapshot was taken';
+    }
+    return null;
+}
+
+/**
  * Restores a past lorebook snapshot from routerHistory.
  * - Deletes any lorebook that was CREATED during the pass (wasn't in snapshot).
  * - Overwrites any lorebook that was MODIFIED during the pass back to its pre-pass content.
@@ -1381,6 +1407,12 @@ export async function rollbackRouterPass(index = 0) {
     try {
         const prePassBooks = new Set(Object.keys(snapshot.bookSnapshots || {}));
         const prefix = getLivePrefix();
+        const liveChatId = ctx.chatId || '';
+        const abortReason = getLoreSnapshotApplyAbortReason(snapshot, prefix, liveChatId);
+        if (abortReason) {
+            console.warn('[RPG Tracker] Rollback aborted: ' + abortReason);
+            return false;
+        }
 
         // -- Step 1: Delete lorebooks that were CREATED during the pass --------
         // Only consider books under the live campaign prefix. If the prefix is missing,
@@ -1470,6 +1502,15 @@ export async function reapplyRouterPass(prePassSnapshot, postPassState) {
     const ctx = SillyTavern.getContext();
 
     try {
+        const prefix = getLivePrefix();
+        const liveChatId = ctx.chatId || '';
+        const redoAbort = getLoreSnapshotApplyAbortReason(prePassSnapshot, prefix, liveChatId)
+            || getLoreSnapshotApplyAbortReason(postPassState, prefix, liveChatId);
+        if (redoAbort) {
+            console.warn('[RPG Tracker] Redo aborted: ' + redoAbort);
+            return false;
+        }
+
         // Step 1: Put the pre-pass snapshot back so the user can undo again
         if (!settings.routerHistory) settings.routerHistory = [];
         settings.routerHistory.unshift(prePassSnapshot);
